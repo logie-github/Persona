@@ -53,3 +53,10 @@ publishes it as the GitHub release `persona-build-N` (N is the version code) wit
 in its description. The app looks at the releases each time it comes to the front (`update/Updater`, at most every five
 minutes), downloads a newer build by itself (resuming after a dropped connection) and opens Android's installer; the first time,
 Android asks to allow installing from this app, and each update needs its one tap. Builds install over each other.
+
+## If signing in fails
+
+The dialog now says why. The whole story (the library's own log lines and the error's stack) is in the app's private `files/signin.log`.
+The first sign-in in build 3 and earlier could not start at all: the library that encrypts the password finds its crypto provider
+by class name, and none was bundled (SpongyCastle is now, `app/build.gradle`). A Guard code is typed in the dialog; approving
+in the phone's app instead is not offered. Connections use the WebSocket route on port 443 only, with up to three tries.

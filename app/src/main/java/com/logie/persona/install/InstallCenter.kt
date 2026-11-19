@@ -13,6 +13,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import `in`.dragonbra.javasteam.enums.EResult
+import `in`.dragonbra.javasteam.steam.authentication.AuthenticationException
+import `in`.dragonbra.javasteam.util.log.LogListener
+import `in`.dragonbra.javasteam.util.log.LogManager
 import java.io.File
 
 /** What a version's install looks like on screen. */
@@ -50,19 +54,46 @@ object InstallCenter {
 
     fun isRunning(id: String): Boolean = _state.value[id] is InstallUi.Running
 
-    suspend fun signIn(context: Context, username: String, password: CharArray): Boolean = try {
-        SignIn(KeystoreLoginStore(context)).signIn(username, password, object : GuardPrompt {
-            override suspend fun code(kind: GuardKind, previousWasWrong: Boolean): String? {
-                val request = CodeRequest(kind, previousWasWrong, CompletableDeferred())
-                _code.value = request
-                return request.reply.await().also { _code.value = null }
-            }
-            override suspend fun approvedOnPhone(): Boolean = true
-        })
-        true
-    } catch (e: Exception) {
-        _code.value = null
-        false
+    /** Null when signed in; otherwise why not, in words (and the whole story is in files/signin.log). Errors included: a failing library must not hide. */
+    suspend fun signIn(context: Context, username: String, password: CharArray): String? {
+        val log = File(context.filesDir, "signin.log")
+        fun note(text: String) = runCatching { log.appendText("${java.util.Date()} $text\n") }
+        val listener = object : LogListener {
+            override fun onLog(clazz: Class<*>, message: String?, throwable: Throwable?) { note("${clazz.simpleName}: $message") }
+            override fun onError(clazz: Class<*>, message: String?, throwable: Throwable?) { note("ERROR ${clazz.simpleName}: $message ${throwable?.stackTraceToString().orEmpty()}") }
+        }
+        LogManager.addListener(listener)
+        return try {
+            SignIn(KeystoreLoginStore(context)).signIn(username, password, object : GuardPrompt {
+                override suspend fun code(kind: GuardKind, previousWasWrong: Boolean): String? {
+                    val request = CodeRequest(kind, previousWasWrong, CompletableDeferred())
+                    _code.value = request
+                    return request.reply.await().also { _code.value = null }
+                }
+                // A typed code is used when the account allows one; waiting for an approval in the phone's app is not offered here.
+                override suspend fun approvedOnPhone(): Boolean = false
+            })
+            null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            _code.value = null; throw e
+        } catch (t: Throwable) {
+            _code.value = null
+            note("sign-in failed: ${t.stackTraceToString()}")
+            describe(t)
+        } finally {
+            LogManager.removeListener(listener)
+        }
+    }
+
+    private fun describe(t: Throwable): String {
+        val result = (t as? AuthenticationException)?.result
+        return when (result) {
+            EResult.InvalidPassword, EResult.AccessDenied -> "The name or password was not accepted."
+            EResult.RateLimitExceeded, EResult.AccountLoginDeniedThrottle -> "Too many tries. Wait a while and try again."
+            EResult.TwoFactorCodeMismatch -> "That code was not right."
+            EResult.Expired -> "The request timed out."
+            else -> "${t.javaClass.simpleName}: ${t.message ?: "no message"}" + (result?.let { " [$it]" } ?: "")
+        }
     }
 
     fun isSignedIn(context: Context): Boolean = SignIn(KeystoreLoginStore(context)).isSignedIn()

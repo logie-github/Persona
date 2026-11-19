@@ -19,7 +19,7 @@ fun SignInDialog(onDone: (Boolean) -> Unit) {
     var name by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     val request by InstallCenter.code.collectAsState()
 
     request?.let { r ->
@@ -47,16 +47,16 @@ fun SignInDialog(onDone: (Boolean) -> Unit) {
                 OutlinedTextField(password, { password = it }, singleLine = true, label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(), enabled = !busy,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-                if (failed) Text("Sign-in failed.", color = MaterialTheme.colorScheme.error)
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
         confirmButton = {
             TextButton(enabled = !busy && name.isNotBlank() && password.isNotEmpty(), onClick = {
-                busy = true; failed = false
+                busy = true; error = null
                 scope.launch {
-                    val ok = InstallCenter.signIn(context, name, password.toCharArray())
-                    busy = false; failed = !ok
-                    if (ok) onDone(true)
+                    val why = InstallCenter.signIn(context, name, password.toCharArray())
+                    busy = false; error = why
+                    if (why == null) onDone(true)
                 }
             }) { Text(if (busy) "Signing in" else "Sign in") }
         },

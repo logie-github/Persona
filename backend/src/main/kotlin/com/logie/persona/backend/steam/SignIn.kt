@@ -34,9 +34,12 @@ class SignIn(private val store: LoginStore) {
                         GlobalScope.future { prompt.approvedOnPhone() }
                 }
             }
-            val session = conn.client.authentication.beginAuthSessionViaCredentials(details).await()
-            val result = session.pollingWaitForResult().await()
-            java.util.Arrays.fill(password, '\u0000')
+            val result = try {
+                val session = conn.client.authentication.beginAuthSessionViaCredentials(details).await()
+                session.pollingWaitForResult().await()
+            } finally {
+                java.util.Arrays.fill(password, '\u0000'); details.password = null
+            }
             store.save(StoredLogin(result.accountName, result.refreshToken, result.newGuardData))
         }
     }

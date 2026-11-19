@@ -7,6 +7,8 @@ import `in`.dragonbra.javasteam.steam.handlers.steamuser.LogOnDetails
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.SteamUser
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOnCallback
 import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
+import `in`.dragonbra.javasteam.steam.steamclient.configuration.SteamConfiguration
+import `in`.dragonbra.javasteam.networking.steam3.ProtocolTypes
 import `in`.dragonbra.javasteam.steam.steamclient.callbackmgr.CallbackManager
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.ConnectedCallback
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.DisconnectedCallback
@@ -16,7 +18,7 @@ import java.io.Closeable
 
 /** A connected [SteamClient] with its callback pump running; [close] stops it. */
 internal class Connection : Closeable {
-    val client = SteamClient()
+    val client = SteamClient(SteamConfiguration.create { it.withProtocolTypes(ProtocolTypes.WEB_SOCKET) })
     val callbacks = CallbackManager(client)
     val user: SteamUser = requireNotNull(client.getHandler<SteamUser>())
 
@@ -34,9 +36,21 @@ internal class Connection : Closeable {
         pump.start()
     }
 
-    suspend fun connect(timeoutMs: Long = 30_000) {
-        client.connect()
-        withTimeout(timeoutMs) { connected.await() }
+    /** Connects, trying again with another server when one is down (a failed server is marked bad by the library). */
+    suspend fun connect(timeoutMs: Long = 20_000, tries: Int = 3) {
+        var last: Throwable? = null
+        repeat(tries) { attempt ->
+            try {
+                val gone = CompletableDeferred<Boolean>()
+                val sub = callbacks.subscribe<DisconnectedCallback> { gone.complete(it.isUserInitiated) }
+                try {
+                    client.connect()
+                    withTimeout(timeoutMs) { kotlinx.coroutines.selects.select<Unit> { connected.onAwait { }; gone.onAwait { throw java.io.IOException("Could not reach the service (attempt ${attempt + 1})") } } }
+                    return
+                } finally { runCatching { sub.close() } }
+            } catch (e: Exception) { last = e; runCatching { client.disconnect() } }
+        }
+        throw java.io.IOException("Could not connect after $tries tries: ${last?.message}", last)
     }
 
     /** Logs on with a saved refresh token; returns the licences the account holds. */
