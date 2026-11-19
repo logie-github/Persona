@@ -1,0 +1,1 @@
+The Windows games' loader is the right one for 64-bit and 32-bit games, so it is used (the last build fell back without it).

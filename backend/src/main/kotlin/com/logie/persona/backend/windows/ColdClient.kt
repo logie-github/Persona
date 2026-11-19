@@ -5,14 +5,14 @@ import java.io.File
 /**
  * The way GameNative starts a store game by default (its "legacy DRM" swap of the game's own library is the other): the game keeps its own
  * steam_api64.dll, and gbe_fork's loader (`steamclient_loader_x64.exe`, its ColdClientLoader) starts it with the emulator's own client library
- * (`steamclient64.dll`) where the store's client would be, so the game's library talks to the emulator. Games that check their library (Denuvo's do)
+ * (`steamclient64.dll`) where the store's client would be (`_x86` for a 32-bit program: the release's names, `release/steamclient_experimental`), so the game's library talks to the emulator. Games that check their library (Denuvo's do)
  * see their own. Everything is in the games' Windows at `C:\Program Files (x86)\Steam`: the loader, the client libraries, the loader's settings
  * (`ColdClientLoader.ini`: which program, its folder, the app's number) and the emulator's (`steam_settings`: the account, its SteamID and the
  * game's ticket, as [SteamEmu.userIni]).
  */
 object ColdClient {
     /** The emulator's files the loader needs (from gbe_fork's `steamclient_experimental`). The overlay libraries are optional. */
-    val REQUIRED = listOf("steamclient.dll", "steamclient64.dll", "steamclient_loader_x32.exe", "steamclient_loader_x64.exe")
+    val REQUIRED = listOf("steamclient.dll", "steamclient64.dll", "steamclient_loader_x64.exe", "steamclient_loader_x86.exe")
     val OPTIONAL = listOf("GameOverlayRenderer.dll", "GameOverlayRenderer64.dll")
 
     data class Prepared(val loader: File, val ini: String)
@@ -21,7 +21,7 @@ object ColdClient {
     fun available(emu: File?): Boolean = emu != null && REQUIRED.all { File(emu, it).isFile }
 
     /** The loader for [exe]: the 64-bit one for a 64-bit program, else the 32-bit one. */
-    fun loaderFor(exe: File): String = if (is64(exe)) "steamclient_loader_x64.exe" else "steamclient_loader_x32.exe"
+    fun loaderFor(exe: File): String = if (is64(exe)) "steamclient_loader_x64.exe" else "steamclient_loader_x86.exe"
 
     /** A PE program's machine is x86-64 (0x8664). */
     fun is64(exe: File): Boolean = runCatching {
@@ -40,8 +40,15 @@ object ColdClient {
         append("AppId=").append(appId).append("\r\n")
         append("SteamClientDll=steamclient.dll\r\n")
         append("SteamClient64Dll=steamclient64.dll\r\n")
+        // As gbe_fork's example has it, but with no message box for a failed injection or an arch difference (the phone has no one to press OK).
         append("\r\n[Injection]\r\n")
+        append("ForceInjectSteamClient=0\r\n")
+        append("ForceInjectGameOverlayRenderer=0\r\n")
+        append("DllsToInjectFolder=\r\n")
+        append("IgnoreInjectionError=1\r\n")
         append("IgnoreLoaderArchDifference=1\r\n")
+        append("\r\n[Persistence]\r\nMode=0\r\n")
+        append("\r\n[Debug]\r\nResumeByDebugger=0\r\n")
     }
 
     /**

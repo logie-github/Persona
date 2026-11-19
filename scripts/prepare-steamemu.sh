@@ -36,7 +36,7 @@ cp "$(pick steam_api64.dll)" "$OUT/steam_api64.dll"
 # The loader way (ColdClient, GameNative's default): the experimental client libraries and the loaders, from the release's steamclient_experimental
 # folder. The app starts a game through them when they are there, else it swaps the game's library as above.
 mkdir -p "$OUT/coldclient"
-for name in steamclient.dll steamclient64.dll steamclient_loader_x32.exe steamclient_loader_x64.exe GameOverlayRenderer.dll GameOverlayRenderer64.dll; do
+for name in steamclient.dll steamclient64.dll steamclient_loader_x64.exe steamclient_loader_x86.exe GameOverlayRenderer.dll GameOverlayRenderer64.dll; do
 	f=$(find "$tmp/x" -ipath '*steamclient_experimental*' -iname "$name" -not -ipath '*extra_dlls*' | head -n 1)
 	if [ -n "$f" ]; then cp "$f" "$OUT/coldclient/$name"; echo "  coldclient: ${f#$tmp/x/}"; else echo "  coldclient: no $name in the release" >&2; fi
 done

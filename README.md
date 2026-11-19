@@ -203,13 +203,17 @@ Winlator's game screen with its "Virtual Gamepad" on screen. Back opens Winlator
 (a `.bind` section) is noted in `files/windows.log`; it may not start without the Steam client.
 
 **The loader (ColdClient).** PLAY starts a store game the way GameNative does by default: the game keeps its own `steam_api64.dll` (a swapped one is
-put back from its `.orig`), and gbe_fork's loader (`steamclient_loader_x64.exe`, or `_x32` for a 32-bit program: `ColdClient`) starts it from the games'
+put back from its `.orig`), and gbe_fork's loader (`steamclient_loader_x64.exe`, or `_x86` for a 32-bit program: `ColdClient`) starts it from the games'
 Windows at `C:\Program Files (x86)\Steam`, with the emulator's experimental client libraries (`steamclient(64).dll`) where the store's client would be.
 Its settings: `ColdClientLoader.ini` (the program as `D:\<folder>\<exe>`, its folder, the app's number) and the emulator's `steam_settings` beside the
 libraries (account, SteamID, ticket). Games that check their own library, as Denuvo's do, see theirs: Persona 4 Golden closed by itself 3 seconds after
 PLAY with its library swapped (issues #1 and #2). `scripts/prepare-steamemu.sh` puts the loader's files in `assets/steamemu/coldclient` from the
 release's `steamclient_experimental`; a build without them swaps the library as before. The app copies the emulator's files out again whenever the
-build's differ.
+build's differ. Run here (19 November 2026) under Winlator's own Wine (x86_64, natively, Xvfb), with this release's files and the app's settings:
+the loader, started on the game desktop (`explorer /desktop=shell,1280x720 C:\Program Files (x86)\Steam\steamclient_loader_x64.exe`), started the
+program at `D:\testgame\Game.exe` (a stand-in: no game files on that machine) on the same desktop with no message box, and wrote
+`HKCU\Software\Valve\Steam\ActiveProcess` (`SteamClientDll64` = the emulator's `steamclient64.dll`), where a game's own library looks for its client.
+Persona 4 Golden itself has not been run that way here.
 
 **The game's ticket.** Games with Denuvo (Persona 4 Golden, Persona 5 Royal...) check the owner's encrypted app ticket when they start and close without it.
 PLAY signs in with the saved sign-in (`steam/GameTickets`), asks for the game's ticket and writes it, with the account's name and SteamID, into the emulator's
