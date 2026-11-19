@@ -1,0 +1,1 @@
+Persona: every game's menu has Play, Install (Uninstall once installed), Version, Mods for PC versions, and Options.

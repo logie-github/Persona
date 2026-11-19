@@ -60,3 +60,22 @@ The dialog now says why. The whole story (the library's own log lines and the er
 The first sign-in in build 3 and earlier could not start at all: the library that encrypts the password finds its crypto provider
 by class name, and none was bundled (SpongyCastle is now, `app/build.gradle`). A Guard code is typed in the dialog; approving
 in the phone's app instead is not offered. Connections use the WebSocket route on port 443 only, with up to three tries.
+
+## Persona 1's screen (in progress; not wired into the app yet)
+
+After the reference picture of the girl with the moon. Three parts, all in `skins/violet` and `tools/art`:
+
+- **The girl** (`tools/art/build_layers_sr.py`, `tools/art/blender/p1_puppet.py`): the high-resolution reference is cut into layers by
+  colour and place (body, pendant, face, ribbon, one continuous hair layer, a small seam filler), each keeping the picture's own pixels
+  (edge pixels re-coloured from the inside so no old background colour fringes). In Blender (bpy, run under Xvfb) each layer is a gridded
+  mesh on a bone rig in the picture's own units; the 96-frame loop is keyed from waves that start and end at rest, parts lag the ones they
+  hang from, and the hair curtains, bangs, ribbon tails and pendant are baked from spring simulations of the head's and body's motion.
+  Frame 0 is the rest pose and matches the picture to about 1 part in 200 on average (hairline edge differences only; the artist's
+  signature and the small figure are left out). Rendered transparent, 1977x1398, then encoded as a looping WebM with alpha.
+- **The menu** (`skins/violet/skin.js`, opentype.js): every word's glyph outlines are warped onto a quad that follows the disc's rim and
+  fans down the page; the chosen word sits on a skewed white band and is gold exactly where the band falls, purple elsewhere.
+- **The words** (`backend/.../catalog/MenuSpec.kt`, tested): PLAY (starts the game), INSTALL (UNINSTALL once installed), VERSION (only where
+  a box has more than one), MODS (PC versions only), OPTIONS (the emulator's, or the game's own: graphics, controls, launch).
+
+Run the page with any static server and `index.html?mock=1&set=p3&sel=1`. The page talks to the app through `window.Skin.setState` and the
+`Android.select` / `Android.activate` bridge. Other games get their own skins the same way.
