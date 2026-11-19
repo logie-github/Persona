@@ -167,6 +167,7 @@ await girl.load('girl/');
 girl.setScene({ moon: ART.moon, colors: { moon: C.moon, ring: C.ring, shard: C.shard }, craters: [[440, 150, 44], [800, 165, 22], [590, 40, 18], [870, 430, 14], [330, 110, 16]], shards: shardList });
 layout(); addEventListener('resize', layout);
 if (window.__pending) window.Skin.setState(window.__pending);        // what the app sent while the page was still loading
+bridge('ready', 0);                                                   // the app answers by sending the state again: a push made before this page existed is lost
 const q = new URLSearchParams(location.search);
 if (q.get('mock')) {
   const sel = +(q.get('sel') || 1);

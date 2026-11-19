@@ -42,6 +42,11 @@ fun SkinScreen(skin: String, state: SkinState, onSelect: (Int) -> Unit, onActiva
     val selectNow = rememberUpdatedState(onSelect)
     val activateNow = rememberUpdatedState(onActivate)
     val json = state.json()
+    val latest = rememberUpdatedState(json)
+    val view = remember { arrayOfNulls<WebView>(1) }
+    // The page keeps what it is sent in window.__pending and draws it once it has loaded; the state is sent whenever it changes, when the page finishes loading and
+    // when the page says it is ready (a push made before the page exists goes to the blank page that was there first, and is lost).
+    fun push() { view[0]?.evaluateJavascript("window.__pending=${latest.value};if(window.Skin)window.Skin.setState(window.__pending);", null) }
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -57,19 +62,19 @@ fun SkinScreen(skin: String, state: SkinState, onSelect: (Int) -> Unit, onActiva
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? = loader.shouldInterceptRequest(request.url)
                     // Nothing outside the app's own page is ever opened in it.
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = request.url.host != DOMAIN
+                    override fun onPageFinished(view: WebView, url: String?) { push() }
                 }
                 addJavascriptInterface(object {
                     @JavascriptInterface fun select(i: Int) { post { selectNow.value(i) } }
                     @JavascriptInterface fun activate(i: Int) { post { activateNow.value(i) } }
+                    @JavascriptInterface fun ready(i: Int) { post { push() } }
                 }, "Android")
+                view[0] = this
                 loadUrl("https://$DOMAIN/assets/$skin/index.html")
             }
         },
-        update = { view ->
-            // set now if the page is up, and kept for the page to take when it finishes loading (it loads fonts and the girl's layers first)
-            view.evaluateJavascript("window.__pending=$json;if(window.Skin)window.Skin.setState(window.__pending);", null)
-        },
-        onRelease = { it.destroy() },
+        update = { push() },
+        onRelease = { view[0] = null; it.destroy() },
     )
 }
 
