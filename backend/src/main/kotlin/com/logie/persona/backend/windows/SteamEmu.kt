@@ -19,7 +19,7 @@ object SteamEmu {
      * [emu] holds the emulator's own steam_api.dll and steam_api64.dll. Libraries already swapped are left as they are, unless the emulator was
      * updated (a different file): then they are swapped again (the originals stay as kept the first time).
      */
-    fun prepare(dir: File, appId: Int, emu: File, accountName: String = "Persona"): Result {
+    fun prepare(dir: File, appId: Int, emu: File, accountName: String = "Persona", steamId64: Long = 0, ticketBase64: String? = null): Result {
         val swapped = ArrayList<String>(); var already = 0
         File(dir, "steam_appid.txt").writeText(appId.toString())
         dir.walkTopDown().maxDepth(8).filter { it.isFile && it.name.lowercase() in NAMES }.forEach { dll ->
@@ -33,10 +33,23 @@ object SteamEmu {
             File(parent, "steam_appid.txt").writeText(appId.toString())
             val settings = File(parent, "steam_settings").also { it.mkdirs() }
             File(settings, "steam_appid.txt").writeText(appId.toString())
-            File(settings, "configs.user.ini").writeText("[user::general]\naccount_name=$accountName\nlanguage=english\n")
+            File(settings, "configs.user.ini").writeText(userIni(accountName, steamId64, ticketBase64))
+            // Not looking for other players on the local network (GameNative's setting for a game played online).
+            File(settings, "configs.main.ini").writeText("[main::connectivity]\ndisable_lan_only=1\n")
         }
         if (swapped.isNotEmpty() || already > 0) File(dir, MARK).writeText("1")
         return Result(swapped, already)
+    }
+
+    /**
+     * gbe_fork's user settings: the account's name and SteamID (the ticket's owner: Denuvo compares them) and the encrypted app ticket, when there is one.
+     */
+    fun userIni(accountName: String, steamId64: Long, ticketBase64: String?): String = buildString {
+        append("[user::general]\n")
+        append("account_name=").append(accountName).append('\n')
+        if (steamId64 != 0L) append("account_steamid=").append(steamId64).append('\n')
+        append("language=english\n")
+        if (!ticketBase64.isNullOrEmpty()) append("ticket=").append(ticketBase64).append('\n')
     }
 
     /** Puts the game's own libraries back (before a repair or an uninstall); returns how many. */

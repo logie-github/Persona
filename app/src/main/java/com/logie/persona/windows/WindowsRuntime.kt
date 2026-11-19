@@ -5,6 +5,8 @@ import android.content.Intent
 import com.logie.persona.backend.catalog.Version
 import com.logie.persona.backend.windows.GameExe
 import com.logie.persona.backend.windows.SteamEmu
+import com.logie.persona.backend.steam.GameTickets
+import com.logie.persona.install.KeystoreLoginStore
 import com.logie.persona.install.InstallCenter
 import com.winlator.XServerDisplayActivity
 import com.winlator.container.Container
@@ -44,6 +46,10 @@ object WindowsRuntime {
     /** Winlator's built-in "Virtual Gamepad" controls profile (assets/inputcontrols/profiles/controls-3.icp). */
     const val GAMEPAD_PROFILE = 3
 
+    /** When the last game was started (SHARE LOG says so). */
+    @Volatile var lastStart: Long? = null
+        private set
+
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -82,17 +88,32 @@ object WindowsRuntime {
         _state.value = State.Preparing(version.id, Step.WINDOWS)
         val options = WindowsOptions.load(context)
         val container = container(context, options.screen)
+        // The account's ticket for the game: games with Denuvo (Persona 4 Golden, Persona 5 Royal...) check it at start and close without it.
+        val ticket = version.appId?.let { appId ->
+            runCatching { GameTickets.fetch(KeystoreLoginStore(context), appId) }
+                .onFailure { log(context, "${version.id}: no game ticket: ${it.message ?: it.javaClass.simpleName}") }.getOrNull()
+        }
+        ticket?.let { log(context, "${version.id}: game ticket ${it.result}${it.ticketBase64?.let { t -> " (${t.length} chars)" }.orEmpty()}") }
         withContext(Dispatchers.IO) {
-            emuDir(context)?.let { emu -> SteamEmu.prepare(dir, version.appId ?: 0, emu, InstallCenter.accountName(context) ?: "Persona") }
+            emuDir(context)?.let { emu ->
+                SteamEmu.prepare(dir, version.appId ?: 0, emu, ticket?.accountName ?: InstallCenter.accountName(context) ?: "Persona", ticket?.steamId64 ?: 0, ticket?.ticketBase64)
+            }
             log(context, "${version.id}: ${exe.name}${if (SteamEmu.isSteamStubbed(exe)) " (wrapped by Steam's DRM: it may not start without the Steam client)" else ""}")
         }
 
         _state.value = State.Preparing(version.id, Step.STARTING)
+        // What Wine reports (errors, faults and their handlers, the libraries it loads) and Box64's basic log, into the session's log (patch 0007).
+        android.preference.PreferenceManager.getDefaultSharedPreferences(context).edit()
+            .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 1).apply()
+        val sessionLog = withContext(Dispatchers.IO) { WindowsLogs.newSession(context) }
+        lastStart = System.currentTimeMillis()
+        log(context, "${version.id}: starting ${exe.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()})")
         val intent = Intent(context, XServerDisplayActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra("container_id", container.id)
             // The program's path (Winlator makes it a Windows path on D:).
             .putExtra("exec_path", exe.path)
+            .putExtra("session_log", sessionLog.path)
             // The game's windows full screen, and the on-screen gamepad (patches/winlator/0006).
             .putExtra("force_fullscreen", true)
             .apply { if (options.gamepad) putExtra("controls_profile", GAMEPAD_PROFILE) }

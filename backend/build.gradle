@@ -6,6 +6,8 @@ dependencies {
 	api 'in.dragonbra:javasteam:1.8.0'
 	api 'in.dragonbra:javasteam-depotdownloader:1.8.0'
 	api 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+	// JavaSteam's messages (a game's encrypted ticket is one): its own version, which it only declares for run time.
+	compileOnly 'com.google.protobuf:protobuf-java:4.31.1'
 	// Mod archives: 7z (with its LZMA) beside zip. org.json is Android's own at run time; the jar is for the JVM tests only.
 	implementation 'org.apache.commons:commons-compress:1.27.1'
 	implementation 'org.tukaani:xz:1.10'

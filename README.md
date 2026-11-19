@@ -190,8 +190,8 @@ warnings again: `cFlags` in `app/build.gradle`); its prebuilt C++ runtime is mad
 
 Patches (`patches/winlator`): 0001 the runtime in the app's data folder and leaving the game returns to the launcher; 0002 resource ids as variables (the
 app's R isn't final); 0003 the runtime installed without Winlator's screens; 0004 the program's arguments apart from its path; 0005 no window picture without
-a GL context (a crash fix); 0006 a game started with on-screen controls (`controls_profile`) and full-screen windows (`force_fullscreen`). 0001 to 0005 are
-the Blizzard launcher's.
+a GL context (a crash fix); 0006 a game started with on-screen controls (`controls_profile`) and full-screen windows (`force_fullscreen`); 0007 the session's programs' output (Wine, Box64, the game)
+written to the file named by the `session_log` extra. 0001 to 0005 are the Blizzard launcher's.
 
 PLAY (`windows/WindowsRuntime`): installs the runtime the first time (a gauge on the game's screen), makes the games' Windows once (one container,
 "Persona", the games' folder as drive D:), finds the game's program (`GameExe`: P4G.exe, P3P.exe, P3R.exe, P5R.exe... else the largest program that isn't an
@@ -200,5 +200,16 @@ installer), swaps the game's steam_api libraries for the **Goldberg emulator's**
 Winlator's game screen with its "Virtual Gamepad" on screen. Back opens Winlator's menu (keyboard, controls, exit). A program wrapped by Steam's own DRM
 (a `.bind` section) is noted in `files/windows.log`; it may not start without the Steam client.
 
-Tested here: the build (Winlator's Java and native code in the app), the program finder and the emulator swap (`WindowsGamesTest`). Not run on a phone:
+**The game's ticket.** Games with Denuvo (Persona 4 Golden, Persona 5 Royal...) check the owner's encrypted app ticket when they start and close without it.
+PLAY signs in with the saved sign-in (`steam/GameTickets`), asks for the game's ticket and writes it, with the account's name and SteamID, into the emulator's
+`steam_settings/configs.user.ini` (`ticket=`, `account_steamid=`: gbe_fork's settings, as GameNative writes them), beside `configs.main.ini`
+(`disable_lan_only=1`). The ticket is fetched at every start (it is short-lived), so PLAY needs the network; without it the game starts with no ticket,
+which a Denuvo game refuses. The result (not the ticket) is noted in `files/windows.log`.
+
+**Logs.** Each start writes `files/windows-session.log` (the one before kept as `.1`): Wine's `err,seh,loaddll` channels and Box64's basic log (patch
+0007), beside the app's notes (`files/windows.log`) and any crash of the app (`files/crash.log`, `PersonaApp`). When there are logs, the game's screen
+shows **SHARE LOG**, which sends all three as text through Android's share sheet.
+
+Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`). The
+ticket request has not been run against the service (it needs a signed-in account that owns the game). Not run on a phone:
 whether Persona 4 Golden starts and plays under Winlator on the Fold has not been seen.

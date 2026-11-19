@@ -43,4 +43,9 @@ class WindowsGamesTest {
         }
         assertTrue(SteamEmu.isSteamStubbed(pe(".bind"))); assertFalse(SteamEmu.isSteamStubbed(pe(".rdata")))
     }
+
+    @Test fun theTicketAndTheAccountGoToTheEmulatorsSettings() {
+        assertEquals("[user::general]\naccount_name=me\naccount_steamid=76561198000000001\nlanguage=english\nticket=QUJD\n", SteamEmu.userIni("me", 76561198000000001, "QUJD"))
+        assertEquals("[user::general]\naccount_name=me\nlanguage=english\n", SteamEmu.userIni("me", 0, null))
+    }
 }

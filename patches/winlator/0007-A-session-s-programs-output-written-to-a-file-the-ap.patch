@@ -1,0 +1,37 @@
+From a590f283e742fcfe590f8cb6bd7b490f9998a32a Mon Sep 17 00:00:00 2001
+From: persona <persona@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 18:01:03 +0000
+Subject: [PATCH] A session's programs' output written to a file the app names
+ (extra session_log)
+
+---
+ .../java/com/winlator/XServerDisplayActivity.java   | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/app/src/main/java/com/winlator/XServerDisplayActivity.java b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+index fb604fb..13b3979 100644
+--- a/app/src/main/java/com/winlator/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+@@ -159,6 +159,19 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         ProcessHelper.removeAllDebugCallbacks();
+         boolean enableLogs = preferences.getBoolean("enable_wine_debug", false) || preferences.getInt("box64_logs", 0) >= 1;
+         if (enableLogs) ProcessHelper.addDebugCallback(debugDialog = new DebugDialog(this));
++        // Persona app: everything the session's programs (Wine, Box64, the game) write goes to a file too (extra "session_log"), which the app can share.
++        String sessionLog = getIntent().getStringExtra("session_log");
++        if (sessionLog != null && !sessionLog.isEmpty()) {
++            final java.io.File logFile = new java.io.File(sessionLog);
++            final long[] written = {0};
++            ProcessHelper.addDebugCallback((line) -> {
++                synchronized (written) {
++                    if (written[0] > 8L << 20) return;
++                    try (java.io.FileWriter w = new java.io.FileWriter(logFile, true)) { w.write(line); w.write('\n'); written[0] += line.length() + 1; }
++                    catch (java.io.IOException e) {}
++                }
++            });
++        }
+         Menu menu = navigationView.getMenu();
+         menu.findItem(R.id.menu_item_logs).setVisible(enableLogs);
+         navigationView.setNavigationItemSelectedListener(this);
+-- 
+2.43.0
+

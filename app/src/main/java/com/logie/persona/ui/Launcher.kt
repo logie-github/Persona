@@ -195,6 +195,10 @@ private fun ThemedGameScreen(game: Game, version: Version, state: GameState, upd
                 LinearProgressIndicator(progress = { g.fraction }, color = t.accent, trackColor = t.ink.copy(alpha = 0.15f), modifier = Modifier.fillMaxWidth(0.6f).padding(top = 6.dp))
             }
             state.notice?.let { Text(it, color = t.ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp)) }
+            state.shareLog?.let { share ->
+                Text("SHARE LOG", fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp, color = t.ink.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(top = 12.dp).clickable { share() }.padding(vertical = 6.dp))
+            }
         }
     }
 }
