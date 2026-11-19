@@ -72,7 +72,14 @@ same account doesn't push it off.
 Run against the real service from the build machine (no account needed): a made-up account is refused by the service itself with `InvalidPassword` and the
 approval link comes back (`LiveSteamTest`, with `PERSONA_LIVE_STEAM=1`). Not run on a phone.
 
-## Persona 1's screen (in progress; not wired into the app yet)
+## Persona 1's screen
+
+The app opens on it. Back goes to the shelf of boxes; a box opens its game's screen (Persona 2 to 5 have a plain list until their own skins are made).
+`ui/SkinScreen` hosts the page in a WebView, served from the app's assets (`skins/` is added to them by `app/build.gradle`) over an https address that exists only
+inside the app (`WebViewAssetLoader`); the app sends it the menu rows with `window.Skin.setState` (kept in `window.__pending` until the page has loaded) and the page
+calls back `Android.select(i)` and `Android.activate(i)`. The rows are `MenuSpec`'s, built by `ui/GameState`: PLAY, INSTALL or UNINSTALL, MODS, OPTIONS (greyed ones
+can't be activated; the chosen word starts on the first usable one). Checked here in a desktop browser with the same address layout and an `Android` stand-in
+(screens look as the reference); not run in a phone's WebView.
 
 After the reference picture of the girl with the moon. All of it is in `skins/violet` (the page) and `tools/art` (how her art is made):
 

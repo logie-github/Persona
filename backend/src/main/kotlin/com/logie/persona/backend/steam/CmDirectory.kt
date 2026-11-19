@@ -30,8 +30,12 @@ internal object CmDirectory {
         try { c.connectTimeout = timeoutMs; c.readTimeout = timeoutMs; return parse(c.inputStream.bufferedReader().readText()) } finally { c.disconnect() }
     }
 
-    fun webServers(): List<ServerRecord> {
-        val endpoints = (try { fetch() } catch (e: Exception) { emptyList() }).ifEmpty { FALLBACK }
-        return endpoints.map { ServerRecord.createWebSocketServer(it) }
+    /** The servers to try, and what to say about the list when it could not be fetched (the built-in list is used then). */
+    class Lookup(val servers: List<ServerRecord>, val note: String?)
+
+    fun lookup(): Lookup {
+        var note: String? = null
+        val fetched = try { fetch().also { if (it.isEmpty()) note = "the list had no port 443 servers" } } catch (e: Exception) { note = "the list could not be fetched (${e.javaClass.simpleName}: ${e.message.orEmpty().take(80)})"; emptyList() }
+        return Lookup((fetched.ifEmpty { FALLBACK }).map { ServerRecord.createWebSocketServer(it) }, note)
     }
 }

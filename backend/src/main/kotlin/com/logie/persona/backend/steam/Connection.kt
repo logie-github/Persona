@@ -98,7 +98,9 @@ internal suspend fun openConnection(perServerMs: Long = 6_000, webServers: Int =
         catch (e: kotlinx.coroutines.CancellationException) { c.close(); throw e }
         catch (e: Exception) { failures += "$label: ${e.message ?: e.javaClass.simpleName}" + c.problems.lastOrNull()?.let { " ($it)" }.orEmpty(); c.close(); return null }
     }
-    for (server in CmDirectory.webServers().take(webServers)) attempt(ProtocolTypes.WEB_SOCKET, server, "web ${server.endpoint.hostString}")?.let { return it }
+    val lookup = CmDirectory.lookup()
+    lookup.note?.let { failures += "server list: $it" }
+    for (server in lookup.servers.take(webServers)) attempt(ProtocolTypes.WEB_SOCKET, server, "web ${server.endpoint.hostString}")?.let { return it }
     repeat(directTries) { attempt(ProtocolTypes.TCP, null, "direct")?.let { return it } }
     throw java.io.IOException("Could not reach the service. " + failures.take(4).joinToString("; "))
 }
