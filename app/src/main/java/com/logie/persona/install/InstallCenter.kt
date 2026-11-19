@@ -10,6 +10,7 @@ import com.logie.persona.backend.steam.NotOwned
 import com.logie.persona.backend.steam.SignIn
 import com.logie.persona.backend.steam.SignInRequired
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -81,6 +82,63 @@ object InstallCenter {
             LogManager.removeListener(listener)
         }
     }
+
+    /** Where the one-time sign-in is, for the sign-in screen. */
+    sealed interface SignInUi {
+        data object Idle : SignInUi
+        data object Working : SignInUi
+        /** Approving: the link to show as a QR code (it is renewed every so often). */
+        data class Link(val url: String) : SignInUi
+        data class Failed(val why: String) : SignInUi
+        data object Done : SignInUi
+    }
+
+    private val _signIn = MutableStateFlow<SignInUi>(SignInUi.Idle)
+    val signInUi: StateFlow<SignInUi> = _signIn
+    // The sign-in runs here, not in the screen's scope: the person leaves the app to approve in the Steam app, and the sign-in must carry on meanwhile
+    // (SignInService keeps the app from being frozen; an activity Android recreates on return finds the same sign-in still running).
+    private val signInScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private var signInJob: kotlinx.coroutines.Job? = null
+    private var approving = false
+
+    /** True while a sign-in by approval is running (a screen shown again joins it instead of starting another). */
+    fun isApproving(): Boolean = approving && signInJob?.isActive == true
+
+    internal fun launchSignIn(context: Context, block: suspend (Context) -> String?) {
+        val app = context.applicationContext
+        signInJob?.cancel()
+        _code.value = null; _waitingForApproval.value = false
+        _signIn.value = SignInUi.Working
+        SignInService.start(app)
+        lateinit var job: kotlinx.coroutines.Job
+        job = signInScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            try {
+                val why = block(app)
+                _signIn.value = if (why == null) SignInUi.Done else SignInUi.Failed(why)
+            } finally {
+                if (signInJob === job) SignInService.stop(app)
+            }
+        }
+        signInJob = job; job.start()
+    }
+
+    /** Starts signing in by approval (a QR code, or the Steam app opened on its link); a sign-in already running is replaced. */
+    fun startApproval(context: Context) { launchSignIn(context) { app -> signInWithApproval(app) { url -> _signIn.value = SignInUi.Link(url) } }; approving = true }
+
+    /** Starts signing in with a name and password; a sign-in already running is replaced. */
+    fun startAccount(context: Context, username: String, password: String, preferCode: Boolean) {
+        launchSignIn(context) { app -> signIn(app, username, password.toCharArray(), preferCode) }; approving = false
+    }
+
+    /** Stops whatever sign-in is running (the screen was closed, or the other way in was chosen). */
+    fun cancelSignIn(context: Context) {
+        signInJob?.cancel(); signInJob = null
+        _code.value = null; _waitingForApproval.value = false; _signIn.value = SignInUi.Idle
+        SignInService.stop(context.applicationContext)
+    }
+
+    /** After the screen has seen the outcome. */
+    fun resetSignIn() { if (signInJob?.isActive != true) _signIn.value = SignInUi.Idle }
 
     private val _waitingForApproval = MutableStateFlow(false)
     /** True while an account's sign-in waits for the person to approve it in the Steam app (the screen offers a code instead). */

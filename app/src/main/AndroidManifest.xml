@@ -26,6 +26,9 @@
             android:configChanges="locale|keyboard|keyboardHidden|navigation|uiMode|orientation|screenSize|smallestScreenSize|screenLayout|density|fontScale" />
         <service android:name=".install.InstallService" android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <!-- Keeps the app awake while a sign-in waits for approval in the Steam app (otherwise Android freezes it, and Steam drops the session). -->
+        <service android:name=".install.SignInService" android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.filesprovider"

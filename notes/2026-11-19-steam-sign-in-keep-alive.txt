@@ -1,0 +1,1 @@
+Steam sign-in: approving in the Steam app on the same phone no longer fails with "failed to load QR info".

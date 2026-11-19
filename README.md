@@ -69,6 +69,12 @@ caught that and was left with no servers, which is the "No CM servers available 
 signed in from here). GameNative notes the same thing beside its own connect call. `SignIn` and `openConnection` now move all of their work to the IO threads,
 whoever calls them. The sign-in also names the device ("Persona on <model>") and presents itself as a Windows client, as GameNative's does.
 
+**"Failed to load QR info" in the Steam app** (build 18): approving on the same phone means leaving this app for the Steam app, and Android freezes an app that
+has left the screen with nothing running in the foreground; the sign-in's connection went quiet and Steam dropped the session before the Steam app could read it.
+The sign-in now runs in `InstallCenter`'s own scope (not the screen's) and `SignInService` holds the app in the foreground with a quiet "Signing in" notification
+until the sign-in ends (approved, refused, cancelled), as GameNative's Steam service does. The same keeps a password sign-in alive while it waits for approval in
+the Steam app. Tested: the flow and the service under Robolectric (`SignInFlowTest`); not on a phone.
+
 Connecting (`openConnection`, `CmDirectory`): web servers on **port 443** first, from the service's own server list (with a built-in list of host names when the
 list can't be fetched), six tries of six seconds, then the direct route. The library's own pick often lands on ports 27017 to 27019, which mobile and public
 networks block, so it is not used first. When nothing connects, the dialog says how each server failed. The whole story (the library's log lines and the

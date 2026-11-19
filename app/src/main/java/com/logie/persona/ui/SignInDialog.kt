@@ -17,44 +17,34 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.logie.persona.backend.steam.GuardKind
 import com.logie.persona.install.InstallCenter
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import com.logie.persona.install.InstallCenter.SignInUi
 
 /**
  * The one-time Steam sign-in, never shown again once it has worked. Two ways in: APPROVE (a QR code and a button that opens the Steam app, nothing typed)
- * and ACCOUNT (name and password, then the Guard code if it asks).
+ * and ACCOUNT (name and password, then approval in the Steam app or the Guard code). The sign-in itself runs in [InstallCenter], kept alive while the person is
+ * in the Steam app approving it; this screen only shows where it is.
  */
 @Composable
 fun SignInDialog(onDone: (Boolean) -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf(0) }
     var name by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var link by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableStateOf(0) }
+    val ui by InstallCenter.signInUi.collectAsState()
     val request by InstallCenter.code.collectAsState()
     val waiting by InstallCenter.waitingForApproval.collectAsState()
-    var job by remember { mutableStateOf<Job?>(null) }
+    val busy = ui is SignInUi.Working || (mode == 0 && ui is SignInUi.Link)
+    val error = (ui as? SignInUi.Failed)?.why
+    val link = (ui as? SignInUi.Link)?.url
 
-    fun signIn(preferCode: Boolean) {
-        busy = true; error = null
-        job = scope.launch {
-            val why = InstallCenter.signIn(context, name, password.toCharArray(), preferCode)
-            busy = false; error = why
-            if (why == null) onDone(true)
-        }
-    }
-
-    // Approving: starts when this tab is shown (and again on a retry), and closes the dialog when the approval arrives.
+    // Approving starts when that tab is shown (and on a retry); choosing the other tab stops it.
     LaunchedEffect(mode, attempt) {
-        if (mode != 0) return@LaunchedEffect
-        link = null; error = null
-        val why = InstallCenter.signInWithApproval(context) { link = it }
-        if (why == null) onDone(true) else error = why
+        if (mode == 0) { if (attempt > 0 || !InstallCenter.isApproving()) InstallCenter.startApproval(context) }
+        else if (InstallCenter.isApproving()) InstallCenter.cancelSignIn(context)
     }
+    LaunchedEffect(ui) { if (ui is SignInUi.Done) { InstallCenter.resetSignIn(); onDone(true) } }
+    fun close() { InstallCenter.cancelSignIn(context); onDone(false) }
 
     request?.let { r ->
         var code by remember(r) { mutableStateOf("") }
@@ -72,13 +62,13 @@ fun SignInDialog(onDone: (Boolean) -> Unit) {
     }
 
     AlertDialog(
-        onDismissRequest = { if (!busy) onDone(false) },
+        onDismissRequest = { close() },
         title = { Text("Sign in to Steam") },
         text = {
             Column {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = mode == 0, onClick = { if (!busy) { mode = 0; error = null } }, label = { Text("Approve") })
-                    FilterChip(selected = mode == 1, onClick = { if (!busy) { mode = 1; error = null } }, label = { Text("Account") })
+                    FilterChip(selected = mode == 0, onClick = { mode = 0 }, label = { Text("Approve") })
+                    FilterChip(selected = mode == 1, onClick = { mode = 1 }, label = { Text("Account") })
                 }
                 Spacer(Modifier.height(12.dp))
                 if (mode == 0) {
@@ -91,26 +81,28 @@ fun SignInDialog(onDone: (Boolean) -> Unit) {
                             Button(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(l)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }) { Text("Open the Steam app") }
                         }
                     }
-                } else {
-                    if (waiting) Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                } else if (waiting) {
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(Modifier.size(40.dp))
                         Spacer(Modifier.height(8.dp))
                         Text("Approve the sign-in in the Steam app")
-                        TextButton(onClick = { job?.cancel(); signIn(preferCode = true) }) { Text("Use a code instead") }
-                    } else {
-                        OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Account name") }, enabled = !busy)
-                        OutlinedTextField(password, { password = it }, singleLine = true, label = { Text("Password") },
-                            visualTransformation = PasswordVisualTransformation(), enabled = !busy,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                        TextButton(onClick = { InstallCenter.startAccount(context, name, password, preferCode = true) }) { Text("Use a code instead") }
                     }
+                } else {
+                    val typing = ui !is SignInUi.Working
+                    OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Account name") }, enabled = typing)
+                    OutlinedTextField(password, { password = it }, singleLine = true, label = { Text("Password") },
+                        visualTransformation = PasswordVisualTransformation(), enabled = typing,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             }
         },
         confirmButton = {
-            if (mode == 1) TextButton(enabled = !busy && name.isNotBlank() && password.isNotEmpty(), onClick = { signIn(preferCode = false) }) { Text(if (busy) "Signing in" else "Sign in") }
+            if (mode == 1) TextButton(enabled = ui !is SignInUi.Working && name.isNotBlank() && password.isNotEmpty(),
+                onClick = { InstallCenter.startAccount(context, name, password, preferCode = false) }) { Text(if (ui is SignInUi.Working) "Signing in" else "Sign in") }
             else if (error != null) TextButton(onClick = { attempt++ }) { Text("Try again") }
         },
-        dismissButton = { TextButton(onClick = { job?.cancel(); onDone(false) }, enabled = !busy || waiting) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = { close() }) { Text("Cancel") } },
     )
 }
