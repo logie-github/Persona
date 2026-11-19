@@ -242,3 +242,4 @@ as `store_api64.dll`); SHARE LOG's text and file are the same.
 
 The token is built in from CI's **`PERSONA_REPORT_TOKEN`** secret (a fine-grained token with Issues: read and write on this repository only), as
 the Blizzard launcher carries `BLIZZ_REPORT_TOKEN`. A build without it keeps its reports on the phone and sends nothing; SHARE LOG still works.
+After the secret is added or changed, a new build carries it: a push, or **Run workflow** on the Actions tab (`workflow_dispatch`, released the same way).

@@ -1,0 +1,1 @@
+Crash reports now go out from the app by itself (this build carries the reports' key).

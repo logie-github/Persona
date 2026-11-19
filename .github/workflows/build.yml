@@ -1,5 +1,6 @@
 name: build
-on: [push]
+# A push builds and releases; so does a run started by hand from the Actions tab (Run workflow), e.g. after a secret was added.
+on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -53,7 +54,7 @@ jobs:
   # main, from the session branches (ccr-*).
   release:
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ccr-'))
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ccr-'))
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
