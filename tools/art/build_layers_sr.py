@@ -85,6 +85,89 @@ def write_layer(out, name, mask1, pixels2, covered1):
     CROPS[name] = dict(x=int(x0 // K), y=int(y0 // K), w=int((x1 - x0) // K), h=int((y1 - y0) // K))
     cv2.imwrite(os.path.join(out, name + '.png'), rgba)
 
+def refine_head(out, face1, hair1, pixels2, ear_box, D=16):
+    """Cleans where the face meets the hair, so nothing tears when they move apart (the user's marks on the phone's recording).
+
+    The picture draws a lavender glow along every strand on the face's side. Left on the face, it stayed put while the strands moved, and showed as a
+    second outline beside each strand, with dark slivers between; the face's fill under the hair carried the same colours. Here the glow moves to the hair
+    layer, unmixed over the face's own flat colour (so at rest the picture is unchanged), and the face under and near the hair is its flat colour only.
+    The black wedge between the left curtain and the collar ([ear_box], art units) becomes hair; light specks at the strands' tips take the hair's colour.
+    D is how far from the hair (art units) the glow is looked for."""
+    c = CROPS['hair']; X0, Y0, X1, Y1 = c['x'] * K, c['y'] * K, (c['x'] + c['w']) * K, (c['y'] + c['h']) * K
+    up = lambda m: cv2.GaussianBlur(cv2.resize(m.astype(np.float32), (AW * K, AH * K), interpolation=cv2.INTER_CUBIC), (0, 0), 1.1)[Y0:Y1, X0:X1] > 0.5
+    face2, hair2 = up(face1), up(hair1)
+    P = pixels2[Y0:Y1, X0:X1].astype(np.float32)
+    h, w = face2.shape
+    def place(name):
+        im = cv2.imread(os.path.join(out, name + '.png'), cv2.IMREAD_UNCHANGED).astype(np.float32)
+        cc = CROPS[name]; x, y = cc['x'] * K - X0, cc['y'] * K - Y0
+        full = np.zeros((h, w, 4), np.float32); full[y:y + im.shape[0], x:x + im.shape[1]] = im
+        return full, (x, y, im.shape[1], im.shape[0])
+    F, fbox = place('face'); Hr, _ = place('hair')
+    def nearest(src_mask, values):
+        _, lab = cv2.distanceTransformWithLabels((~src_mask).astype(np.uint8), cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
+        ys, xs = np.nonzero(src_mask); lut = np.zeros((lab.max() + 1, values.shape[2]), np.float32); lut[lab[ys, xs]] = values[ys, xs]
+        return lut[lab]
+    lum = lambda im: im[..., 2] * 0.30 + im[..., 1] * 0.59 + im[..., 0] * 0.11
+    dh = cv2.distanceTransform((~hair2).astype(np.uint8), cv2.DIST_L2, 5)
+    dface = cv2.distanceTransform(face2.astype(np.uint8), cv2.DIST_L2, 5)
+    # the face's own flat colours, from well inside it (smoothed, so the picture's grain does not travel), carried to every pixel
+    Ps = cv2.GaussianBlur(cv2.medianBlur(P.astype(np.uint8), 5).astype(np.float32), (0, 0), 1.0)
+    blackish = (P.max(-1) - P.min(-1) < 30) & (lum(P) < 60)                       # drawn black (the wedge by the left curtain), not the hair's purple
+    ex0, ey0, ex1, ey1 = [v * K for v in ear_box]
+    box = np.zeros((h, w), bool); box[max(ey0 - Y0, 0):ey1 - Y0, max(ex0 - X0, 0):ex1 - X0] = True
+    cord = (cv2.dilate((blackish & ~box).astype(np.uint8), np.ones((7, 7), np.uint8)) > 0) & face2       # the pendant's cord and other thin black lines on the face: kept as drawn
+    ear = box & blackish
+    ear = cv2.morphologyEx(ear.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)) > 0
+    near_ear = cv2.dilate(ear.astype(np.uint8), np.ones((11, 11), np.uint8)) > 0          # with its grey edge
+    inner = face2 & (dh > 2 * D) & (dface > 6) & ~blackish & ~cord & ~near_ear          # (a line's own pixels must not be spread as the face's colour)
+    Fc = nearest(inner, Ps)
+    # the glow: face pixels near the hair that differ from that flat colour, joined to the hair
+    Pg = cv2.GaussianBlur(P, (0, 0), 0.7)
+    diff = np.sqrt(((Pg - Fc) ** 2).sum(-1))
+    cand = face2 & (dh <= 2 * D) & (diff > 10)
+    n, lab = cv2.connectedComponents(cand.astype(np.uint8), connectivity=8)
+    keep = np.unique(lab[cand & (dh <= 4)]); band = np.isin(lab, keep[keep > 0])
+    dmax = 60.0                                   # a glow this strong or more is all glow (darker pixels by a strand are the strand's own edge)
+    ramp = np.clip((diff - 5) / 10, 0, 1); ramp = ramp * ramp * (3 - 2 * ramp)
+    a = np.where(band, np.clip(diff / dmax, 0, 1) * ramp, 0).astype(np.float32)
+    a = np.minimum(a, cv2.GaussianBlur(band.astype(np.float32), (0, 0), 0.8))       # no hard step where the band ends
+    C = np.clip(Fc + (Pg - Fc) / np.maximum(a, 1e-3)[..., None], 0, 255)
+    # the black wedge by the left curtain: hair now (and the face carries on beneath it)
+    ear_soft = cv2.GaussianBlur(cv2.dilate(ear.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(np.float32), (0, 0), 1.0)
+    a = np.where((ear_soft > 0.01) | cord, 0, a); band &= ~ear & ~cord
+    # the hair: its own pixels in its own colour (no light specks at the tips), then the glow under it, then the wedge
+    hA = Hr[..., 3] / 255.0; hRGB = Hr[..., :3]
+    # the hair's own purple, carried to every pixel: light specks at the tips, and near-black colourless pixels (the wedge), take it
+    grey = (hRGB.max(-1) - hRGB.min(-1) < 30) & (lum(hRGB) < 60)
+    purple = (hA > 0.9) & (lum(hRGB) > 40) & (lum(hRGB) < 90) & ~grey             # the hair's main tone (its darkest shade would leave streaks)
+    hair_col = cv2.GaussianBlur(nearest(purple, hRGB), (0, 0), 2.0)
+    tone = np.median(hRGB[purple], axis=0)                                         # the hair is one flat colour in the picture
+    hRGB = np.where(((lum(hRGB) > 100) & (hA > 0))[..., None], hair_col, hRGB)
+    hRGB = np.where((grey & (hA > 0))[..., None], tone, hRGB)
+    hRGB = np.where(ear_soft[..., None] > 0.01, tone, hRGB)
+    hA = np.maximum(hA, np.clip(ear_soft * 1.6, 0, 1))
+    pre = hRGB * hA[..., None] + C * (a * (1 - hA))[..., None]
+    outA = hA + a * (1 - hA)
+    rgb = pre / np.maximum(outA, 1e-4)[..., None]
+    solid = outA > 0.5
+    rgb = np.where((outA < 0.5)[..., None], np.where((outA > 0.02)[..., None], rgb, nearest(solid, rgb)), rgb)
+    hair_out = np.dstack([np.clip(rgb, 0, 255), np.clip(outA * 255, 0, 255)]).astype(np.uint8)
+    # the face: its flat colour wherever the hair is or may move to, and beneath the wedge
+    fA = F[..., 3]
+    flat = ((dh <= 2 * D) | ~face2 | near_ear) & ~cord
+    fRGB = np.where((flat & (fA > 0))[..., None], Fc, F[..., :3])
+    # and it lies beneath the hair (and the wedge) wherever the hair could uncover it, with no hole for what is under the head to show through
+    near_face = cv2.dilate(face2.astype(np.uint8), np.ones((4 * D + 1, 4 * D + 1), np.uint8)) > 0
+    under = cv2.GaussianBlur(((hair2 | ear) & near_face).astype(np.float32), (0, 0), 1.0)
+    fA = np.maximum(fA, 255 * np.clip(under * 1.6, 0, 1) * near_face)
+    fRGB = np.where((under > 0.01)[..., None] & (F[..., 3] < 250)[..., None], Fc, fRGB)
+    fRGB = np.where((fA <= 5)[..., None], nearest(fA > 128, fRGB), fRGB)
+    x, y, fw, fh = fbox
+    cv2.imwrite(os.path.join(out, 'face.png'), np.dstack([np.clip(fRGB, 0, 255), np.clip(fA, 0, 255)]).astype(np.uint8)[y:y + fh, x:x + fw])
+    cv2.imwrite(os.path.join(out, 'hair.png'), hair_out)
+    return dict(band_px=int(band.sum()), dmax=dmax, ear_px=int(ear.sum()))
+
 def main(src, out):
     os.makedirs(out, exist_ok=True)
     big = cv2.imread(src)
@@ -213,6 +296,7 @@ def main(src, out):
     # the ribbon runs on under the hair only along the band over her head and into the loop on the right, never down the tail
     write_layer(out, 'ribbon', ribbon, img2, hair_mask & (cv2.dilate(ribbon.astype(np.uint8), np.ones((41, 41), np.uint8)) > 0) & (yy < 640))
     write_layer(out, 'hair', hair_mask, img2, np.zeros_like(pendant))
+    print('head', refine_head(out, face, hair_mask, img2, ear_box=(195, 690, 330, 870)))
 
     # the moon and the squares, as before
     yellow = (idx == YEL) & inside

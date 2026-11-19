@@ -87,6 +87,11 @@ After the reference picture of the girl with the moon. All of it is in `skins/vi
   ribbon, one continuous hair layer, a small seam filler), each keeping the picture's own pixels, with edge pixels re-coloured from the inside
   so no old background colour fringes. What the artist's signature and the small figure hid is drawn in by hand as flat shapes in colours
   sampled from the picture (the sleeve and its fold line, the torso, the tie ending in a point), and nothing of her passes the disc's edge.
+- **Where the face meets the hair** (`refine_head` in the same script, after the user's marks on the phone's recording): the picture's lavender glow along each
+  strand is moved from the face to the hair layer, unmixed over the face's own flat colour so the still picture is unchanged, and the face under and near the hair
+  is that flat colour only. When the bangs move, the glow goes with them (before, it stayed on the face as a second outline, with dark slivers between). The black
+  wedge between the left curtain and the collar is hair now (it broke into black and white pieces as the curtain swung), light specks at the strands' tips take the
+  hair's colour, and the pendant's cord stays as drawn. Checked by rendering the live page at eight moments of the loop before and after; not on a phone.
 - **Her animation** (`tools/art/blender/p1_puppet.py`, Blender's bpy under Xvfb): each layer is a gridded mesh on a bone rig in the picture's
   own units; the 4-second loop is keyed from waves that start and end at rest, parts lag the ones they hang from, and the hair curtains, bangs,
   ribbon tails and pendant are baked from spring simulations. `--export-rig` writes every bone's matrix 60 times a second (`girl/rig.json`).
