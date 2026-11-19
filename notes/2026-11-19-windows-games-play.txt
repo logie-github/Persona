@@ -1,0 +1,1 @@
+Persona 3, 4 and 5 can be played: PLAY starts the installed game on the built-in Windows runtime, with an on-screen gamepad.

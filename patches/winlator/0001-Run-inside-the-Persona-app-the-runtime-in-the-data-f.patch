@@ -1,0 +1,68 @@
+From c9367c4079268363514fbddf6e508d85216c420b Mon Sep 17 00:00:00 2001
+From: persona <persona@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 16:00:28 +0000
+Subject: [PATCH 1/6] Run inside the Persona app: the runtime in the data
+ folder, leaving the game returns to the launcher
+
+---
+ .../main/java/com/winlator/XServerDisplayActivity.java | 10 ++--------
+ .../java/com/winlator/services/ForegroundService.java  |  2 +-
+ .../main/java/com/winlator/xenvironment/RootFS.java    |  7 +++----
+ 3 files changed, 6 insertions(+), 13 deletions(-)
+
+diff --git a/app/src/main/java/com/winlator/XServerDisplayActivity.java b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+index 53fb456..52e0013 100644
+--- a/app/src/main/java/com/winlator/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+@@ -427,15 +427,9 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         winHandler.stop();
+         if (environment != null) environment.stopEnvironmentComponents();
+ 
+-        Intent intent = getIntent();
+-        if (intent.hasExtra("exec_path")) {
+-            AppUtils.RestartApplicationOptions options = new AppUtils.RestartApplicationOptions();
+-            options.containerId = container.id;
+-            options.startPath = FileUtils.getDirname(intent.getStringExtra("exec_path"));
+-            AppUtils.restartApplication(this, options);
+-        }
+-        else AppUtils.restartApplication(this);
++        // Persona app: back to the launcher, without restarting the app.
+         ForegroundService.stopSession(this);
++        finish();
+     }
+ 
+     private void setupWineSystemFiles() {
+diff --git a/app/src/main/java/com/winlator/services/ForegroundService.java b/app/src/main/java/com/winlator/services/ForegroundService.java
+index 0940581..5c773f9 100644
+--- a/app/src/main/java/com/winlator/services/ForegroundService.java
++++ b/app/src/main/java/com/winlator/services/ForegroundService.java
+@@ -275,7 +275,7 @@ public class ForegroundService extends Service {
+         boolean containerActive = sessionActive.get();
+ 
+         // Determine target activity: Game screen if active, else Main menu
+-        Class<?> targetActivity = containerActive ? XServerDisplayActivity.class : MainActivity.class;
++        Class<?> targetActivity = containerActive ? XServerDisplayActivity.class : com.logie.persona.MainActivity.class;
+ 
+         Notification n = notificationUtils.createForegroundNotification(
+                 getNotificationContent(),
+diff --git a/app/src/main/java/com/winlator/xenvironment/RootFS.java b/app/src/main/java/com/winlator/xenvironment/RootFS.java
+index a1aeba7..580d3d9 100644
+--- a/app/src/main/java/com/winlator/xenvironment/RootFS.java
++++ b/app/src/main/java/com/winlator/xenvironment/RootFS.java
+@@ -24,10 +24,9 @@ public class RootFS {
+     }
+ 
+     public static RootFS find(Context context) {
+-        File legacyDir = new File(context.getFilesDir(), "imagefs");
+-        File rootDir = new File(context.getFilesDir(), "rootfs");
+-        if (legacyDir.isDirectory()) legacyDir.renameTo(rootDir);
+-        return new RootFS(rootDir);
++        // Persona app: in the app's data folder, /data/data/<package>/winroot, the path the runtime's
++        // programs have compiled in (rewritten from Winlator's at build time, the same length).
++        return new RootFS(new File(context.getDataDir(), "winroot"));
+     }
+ 
+     public File getRootDir() {
+-- 
+2.43.0
+

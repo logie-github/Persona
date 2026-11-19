@@ -15,6 +15,7 @@ import com.logie.persona.install.InstallUi
 import com.logie.persona.install.Wording
 import com.logie.persona.psp.PspLauncher
 import com.logie.persona.psp.PspStore
+import com.logie.persona.windows.WindowsRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,15 +54,23 @@ fun rememberGame(game: Game, version: Version, ui: InstallUi, onVersion: () -> U
         }
     }
     val installed = if (psp) pspInstalled else ui is InstallUi.Done
+    val windows by WindowsRuntime.state.collectAsState()
+    val windowsBusy = windows is WindowsRuntime.State.Preparing
     val busy = importing != null || ui is InstallUi.Running
     val rows = MenuSpec.optionsFor(game, version, installed, busy).map { o ->
-        // Play needs a runtime (only the PSP one is in the app so far), and a disc game other than Persona 1 needs its importer.
-        val usable = o.enabled && (psp || o.id != OptionId.PLAY) && !(o.id == OptionId.INSTALL && !psp && version.origin == Origin.DISC_IMAGE)
+        // Play needs a runtime (the PSP emulator, or Windows through Winlator; Persona 2's PS1 one isn't in the app yet), and a disc game other than
+        // Persona 1 needs its importer.
+        val usable = o.enabled && (o.id != OptionId.PLAY || version.runtime != Runtime.PS1_EMULATOR) && !(windowsBusy && o.id == OptionId.PLAY) &&
+            !(o.id == OptionId.INSTALL && !psp && version.origin == Origin.DISC_IMAGE)
         MenuRow(o.id, o.label, usable)
     }
     val gauge = importing?.let { Gauge("Installing", it) } ?: (ui as? InstallUi.Running)?.let { Gauge(Wording.step(it.progress.step), it.progress.fraction) }
+        ?: (windows as? WindowsRuntime.State.Preparing)?.takeIf { it.versionId == version.id }?.let { p ->
+            Gauge(when (p.step) { WindowsRuntime.Step.RUNTIME -> "Getting ready"; WindowsRuntime.Step.WINDOWS -> "Setting up"; WindowsRuntime.Step.STARTING -> "Starting" }, p.progress ?: 1f)
+        }
     val words = when {
         notice != null -> notice
+        windows is WindowsRuntime.State.Failed && (windows as WindowsRuntime.State.Failed).versionId == version.id -> (windows as WindowsRuntime.State.Failed).message
         ui is InstallUi.NotInLibrary -> Wording.NOT_IN_LIBRARY
         ui is InstallUi.Failed -> Wording.FAILED
         else -> null
@@ -70,7 +79,7 @@ fun rememberGame(game: Game, version: Version, ui: InstallUi, onVersion: () -> U
         rows, gauge, words, showOptions && psp,
         perform = { id ->
             when (id) {
-                OptionId.PLAY -> notice = PspLauncher.play(context)
+                OptionId.PLAY -> if (psp) notice = PspLauncher.play(context) else { WindowsRuntime.dismiss(); WindowsRuntime.play(context, version) }
                 OptionId.INSTALL -> if (psp) picker.launch(arrayOf("*/*")) else onSteamInstall()
                 OptionId.UNINSTALL -> if (psp) { PspStore.uninstall(context); pspInstalled = false } else InstallCenter.uninstall(context, version)
                 OptionId.VERSION -> onVersion()

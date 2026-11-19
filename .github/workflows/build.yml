@@ -11,6 +11,29 @@ jobs:
       # The PSP emulator (PPSSPP) is built from its own source, patched by patches/ppsspp. Its NDK and CMake come from the runner's SDK.
       - run: sh scripts/prepare-ppsspp.sh
       - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;29.0.14206865" "cmake;3.22.1" > /dev/null
+      # The Windows games' runtime, Winlator (patched by patches/winlator; its runtime's archives rewritten for this app's path), kept in a cache by
+      # what makes it; and the Steam emulator they run with (gbe_fork's Windows libraries).
+      - name: Look for Winlator
+        id: winlator
+        uses: actions/cache/restore@v4
+        with:
+          path: app/winlator
+          key: persona-winlator-v1-${{ hashFiles('winlator-version.env', 'patches/winlator/**', 'scripts/prepare-winlator.sh', 'scripts/winlator-rewrite.py') }}
+      - name: Prepare Winlator
+        if: steps.winlator.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-zstandard > /dev/null
+          scripts/prepare-winlator.sh
+      - name: Save Winlator
+        if: steps.winlator.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: app/winlator
+          key: ${{ steps.winlator.outputs.cache-primary-key }}
+      - name: Steam emulator
+        run: |
+          command -v 7z > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full > /dev/null; }
+          scripts/prepare-steamemu.sh
       # Release build, signed with the app's own key so each release installs over the last.
       - run: ./gradlew :backend:test :app:testDebugUnitTest :app:assembleRelease -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
       - run: cp app/build/outputs/apk/release/app-release.apk Persona.apk

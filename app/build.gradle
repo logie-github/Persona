@@ -9,6 +9,14 @@ def prop = { String name, String fallback ->
 	value.isEmpty() ? fallback : value
 }
 
+// The Windows games' runtime, Winlator (scripts/prepare-winlator.sh puts it in app/winlator, git-ignored), and the Steam emulator the games
+// run with instead of the Steam client (scripts/prepare-steamemu.sh puts it in app/steamemu; optional for a local build: without it a
+// game starts with its own steam_api).
+def winlator = file("winlator")
+if (!new File(winlator, "java").isDirectory()) {
+	throw new GradleException("Winlator isn't in app/winlator: run scripts/prepare-winlator.sh")
+}
+
 android {
 	namespace = 'com.logie.persona'
 	compileSdk = 36
@@ -29,6 +37,8 @@ android {
 		buildConfigField "String", "UPDATE_REPO", "\"${prop('personaUpdateRepo', 'logie-github/Persona')}\""
 		buildConfigField "String", "RELEASE_TAG_PREFIX", "\"persona-build\""
 		ndk { abiFilters "arm64-v8a" }
+		// Winlator's C is written for an older NDK's compiler; this one's newer errors for old C are warnings again.
+		externalNativeBuild { cmake { cFlags '-Wno-error=implicit-function-declaration', '-Wno-error=incompatible-function-pointer-types', '-Wno-error=int-conversion' } }
 	}
 
 	// One key for every build, so each release installs over the last.
@@ -53,13 +63,33 @@ android {
 		targetCompatibility JavaVersion.VERSION_17
 	}
 
+	// Winlator's native code (its X server, renderers, audio), with CMake.
+	externalNativeBuild {
+		cmake {
+			path = file("winlator/cpp/CMakeLists.txt")
+			version = "3.22.1"
+		}
+	}
+
 	packaging {
-		jniLibs { useLegacyPackaging = true }
+		jniLibs {
+			useLegacyPackaging = true
+			// Winlator's prebuilt libraries and the PSP emulator both bring the C++ runtime; the app's copy is made the NDK's own (prepareCxxShared), so both are the same file.
+			pickFirsts += ['lib/arm64-v8a/libc++_shared.so']
+		}
 		resources { excludes += ['META-INF/{AL2.0,LGPL2.1}', 'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/*.kotlin_module'] }
 	}
 
 	// The skins (skins/<name>: the page, its art and fonts) are part of the app's assets, under their own folder names.
-	sourceSets.main.assets.srcDirs += ['../skins']
+	sourceSets.main.assets.srcDirs += ['../skins', 'winlator/assets', 'steamemu/assets']
+	sourceSets.main.java.srcDirs += ['winlator/java']
+	sourceSets.main.res.srcDirs += ['winlator/res']
+	sourceSets.main.jniLibs.srcDirs += ['winlator/jniLibs']
+
+	androidResources {
+		// Already compressed (Winlator's runtime archives).
+		noCompress += ['tzst', 'zip']
+	}
 
 	testOptions.unitTests.includeAndroidResources = true
 	testOptions.unitTests.all {
@@ -81,6 +111,13 @@ dependencies {
 	implementation 'com.google.zxing:core:3.5.3'
 	// Serves the skins (web pages in the app's assets) to the WebView from an address that exists only inside the app.
 	implementation 'androidx.webkit:webkit:1.12.1'
+	// Winlator's.
+	implementation 'com.google.android.material:material:1.11.0'
+	implementation 'org.apache.commons:commons-compress:1.27.1'
+	implementation 'org.tukaani:xz:1.10'
+	implementation 'androidx.preference:preference:1.2.1'
+	implementation 'androidx.lifecycle:lifecycle-process:2.8.7'
+	implementation 'com.github.luben:zstd-jni:1.5.2-3@aar'
 	// Steam's sign-in encrypts the password with a provider JavaSteam looks up by name on Android: without these the sign-in cannot start.
 	implementation 'com.madgag.spongycastle:core:1.58.0.0'
 	implementation 'com.madgag.spongycastle:prov:1.58.0.0'
@@ -96,3 +133,15 @@ dependencies {
 	testImplementation 'androidx.compose.ui:ui-test-junit4'
 	debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
+
+// The C++ runtime Winlator's prebuilt libraries link against, made the NDK's own (the PSP emulator's is the same NDK's): one file, whichever
+// copy the packaging picks.
+def prepareCxxShared = tasks.register('prepareCxxShared') {
+	def host = System.getProperty('os.name').toLowerCase().contains('mac') ? 'darwin-x86_64' : 'linux-x86_64'
+	def ndk = new File(androidComponents.sdkComponents.sdkDirectory.get().asFile, "ndk/${android.ndkVersion}")
+	def from = new File(ndk, "toolchains/llvm/prebuilt/$host/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+	def to = file('winlator/jniLibs/arm64-v8a/libc++_shared.so')
+	inputs.file(from); outputs.file(to)
+	doLast { java.nio.file.Files.copy(from.toPath(), to.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+}
+tasks.named('preBuild').configure { dependsOn prepareCxxShared }

@@ -1,0 +1,38 @@
+From a92f241bd0290b40ce6b19823120d35b203b346b Mon Sep 17 00:00:00 2001
+From: persona <persona@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 16:00:45 +0000
+Subject: [PATCH 6/6] A game started with on-screen controls and fullscreen
+ windows (extras controls_profile, force_fullscreen)
+
+---
+ app/src/main/java/com/winlator/XServerDisplayActivity.java | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/app/src/main/java/com/winlator/XServerDisplayActivity.java b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+index 6750cc0..fb604fb 100644
+--- a/app/src/main/java/com/winlator/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+@@ -565,7 +565,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         renderer.setCursorVisible(false);
+         renderer.setCursorColor(preferences.getInt("cursor_color", 0xffffff));
+         renderer.setCursorScale(preferences.getFloat("cursor_scale", 1.0f));
+-        renderer.setForceWindowsFullscreen(shortcut != null && shortcut.getExtra("forceFullscreen", "0").equals("1"));
++        renderer.setForceWindowsFullscreen((shortcut != null && shortcut.getExtra("forceFullscreen", "0").equals("1")) || getIntent().getBooleanExtra("force_fullscreen", false));
+ 
+         xServer.setRenderer(renderer);
+         rootView.addView(xServerView);
+@@ -601,6 +601,11 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+                 if (profile != null) showInputControls(profile);
+             }
+         }
++        // Persona app: the on-screen controls a game starts with (extra "controls_profile", a profile's id), without a shortcut.
++        else if (getIntent().hasExtra("controls_profile")) {
++            ControlsProfile profile = inputControlsManager.getProfile(getIntent().getIntExtra("controls_profile", 0));
++            if (profile != null) showInputControls(profile);
++        }
+ 
+         if (MainActivity.DEBUG_MODE) rootView.addView(AppUtils.createDebugMsgTextView(this));
+         AppUtils.observeSoftKeyboardVisibility(drawerLayout, renderer::setScreenOffsetYRelativeToCursor);
+-- 
+2.43.0
+

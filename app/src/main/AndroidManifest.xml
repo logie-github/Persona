@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- The Windows games (Winlator): sound, rumble and network status. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Persona"
@@ -24,6 +29,19 @@
         <activity android:name=".psp.PspActivity" android:exported="false" android:process=":psp"
             android:theme="@style/ppsspp_style" android:screenOrientation="sensorLandscape" android:launchMode="singleTask"
             android:configChanges="locale|keyboard|keyboardHidden|navigation|uiMode|orientation|screenSize|smallestScreenSize|screenLayout|density|fontScale" />
+        <!-- The Windows games: Winlator's screen (its X server with Wine and Box64 behind it), its controls editor, and the service that keeps
+             the game alive in the background. Its own main screen stays, unlisted, for the code that refers to it. -->
+        <activity android:name="com.winlator.XServerDisplayActivity" android:exported="false" android:theme="@style/AppThemeFullscreenDark"
+            android:supportsPictureInPicture="true" android:launchMode="singleTask" android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|density|navigation" />
+        <activity android:name="com.winlator.ControlsEditorActivity" android:exported="false" android:theme="@style/AppThemeFullscreenDark"
+            android:screenOrientation="sensorLandscape" />
+        <activity android:name="com.winlator.ExternalControllerBindingsActivity" android:exported="false" android:theme="@style/AppThemeDark"
+            android:screenOrientation="sensor" />
+        <activity android:name="com.winlator.MainActivity" android:exported="false" android:theme="@style/AppThemeDark"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|density|navigation" />
+        <service android:name="com.winlator.services.ForegroundService" android:exported="false"
+            android:foregroundServiceType="mediaPlayback" android:stopWithTask="false" />
         <service android:name=".install.InstallService" android:exported="false"
             android:foregroundServiceType="dataSync" />
         <!-- Keeps the app awake while a sign-in waits for approval in the Steam app (otherwise Android freezes it, and Steam drops the session). -->

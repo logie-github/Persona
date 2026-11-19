@@ -182,6 +182,9 @@ object InstallCenter {
     /** What the account's list of signed-in devices shows for this phone. */
     private fun deviceName(): String = "Persona on ${android.os.Build.MODEL ?: "Android"}"
 
+    /** The signed-in account's name (the Steam emulator gives it to the games, for their own save folders). */
+    fun accountName(context: Context): String? = runCatching { KeystoreLoginStore(context).load()?.username }.getOrNull()
+
     fun isSignedIn(context: Context): Boolean = SignIn(KeystoreLoginStore(context)).isSignedIn()
 
     /** The install itself: runs inside the service. */

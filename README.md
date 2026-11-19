@@ -169,3 +169,26 @@ search the game by title and version, a grid of its box pictures, a tap download
 a crop to the box's 2:3 shape (drag, pinch or slide; `CropMath`, tested) and the result is kept as `files/art/<version>-box.jpg` (the source stays in `art-src` so CROP can adjust it later).
 RESET puts the numbered box back. The SteamGridDB key is asked for in the picker the first time and kept in the app's preferences (the KEY button forgets it); it is sent only to steamgriddb.com.
 Not yet ported from Blizzard: the music picker, the loading screen maker and the icon picker.
+
+## The Windows games (Persona 3, 4, 5): PLAY
+
+Installed through the account (above), they run on **Winlator** (Wine, Box64, its graphics drivers and its X server), built into the app the Blizzard
+launcher's way: `scripts/prepare-winlator.sh` checks out Winlator's commit (`winlator-version.env`) into `build/winlator-app`, applies `patches/winlator`
+and copies it to `app/winlator` (git-ignored), rewriting its runtime's install path for this app (`/data/data/com.logie.persona/winroot`, the same length as
+Winlator's own). Its Java is compiled into the app module with the app's R; its native code with the app's CMake (the NDK's newer errors for old C are
+warnings again: `cFlags` in `app/build.gradle`); its prebuilt C++ runtime is made the NDK's own so it is the same file as the PSP emulator's.
+
+Patches (`patches/winlator`): 0001 the runtime in the app's data folder and leaving the game returns to the launcher; 0002 resource ids as variables (the
+app's R isn't final); 0003 the runtime installed without Winlator's screens; 0004 the program's arguments apart from its path; 0005 no window picture without
+a GL context (a crash fix); 0006 a game started with on-screen controls (`controls_profile`) and full-screen windows (`force_fullscreen`). 0001 to 0005 are
+the Blizzard launcher's.
+
+PLAY (`windows/WindowsRuntime`): installs the runtime the first time (a gauge on the game's screen), makes the games' Windows once (one container,
+"Persona", the games' folder as drive D:), finds the game's program (`GameExe`: P4G.exe, P3P.exe, P3R.exe, P5R.exe... else the largest program that isn't an
+installer), swaps the game's steam_api libraries for the **Goldberg emulator's** (`SteamEmu`, gbe_fork's Windows release, fetched by
+`scripts/prepare-steamemu.sh` into `app/steamemu`; the originals kept as `.orig`), so the game runs without the Steam client, as GameNative does, and starts
+Winlator's game screen with its "Virtual Gamepad" on screen. Back opens Winlator's menu (keyboard, controls, exit). A program wrapped by Steam's own DRM
+(a `.bind` section) is noted in `files/windows.log`; it may not start without the Steam client.
+
+Tested here: the build (Winlator's Java and native code in the app), the program finder and the emulator swap (`WindowsGamesTest`). Not run on a phone:
+whether Persona 4 Golden starts and plays under Winlator on the Fold has not been seen.
