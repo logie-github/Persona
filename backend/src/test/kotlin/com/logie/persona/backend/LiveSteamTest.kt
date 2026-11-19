@@ -26,7 +26,8 @@ class LiveSteamTest {
         override suspend fun approvedOnPhone(): Boolean = false
     }
 
-    @Test fun aMadeUpAccountIsRefusedByTheServiceNotByTheConnection() = runBlocking {
+    // Called from one thread of its own, as the phone's sign-in screen calls it from the main thread: the sign-in must move its network work elsewhere.
+    @Test fun aMadeUpAccountIsRefusedByTheServiceNotByTheConnection() = runBlocking(kotlinx.coroutines.newSingleThreadContext("main")) {
         live()
         val store = FileLoginStore(File.createTempFile("persona-live", ".txt").also { it.delete() })
         try {

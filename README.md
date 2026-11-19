@@ -63,6 +63,12 @@ sign-in with nothing typed (`SignIn.signInWithApproval`). **Account** takes the 
 waits for approval in the Steam app and offers "Use a code instead" (it signs in again asking for the code); email codes are typed in the same way.
 This is the same set of ways GameNative offers (QR, password with approval or code); the library is the same (JavaSteam) with SpongyCastle bundled.
 
+**Why it failed on the phone** (builds up to 17): the sign-in screen started the sign-in on Android's main thread, and the library looks up Steam's servers (a web
+request, then a name lookup per server) on the thread that connects. Android refuses network use on the main thread (NetworkOnMainThreadException); the library
+caught that and was left with no servers, which is the "No CM servers available to connect to" the phone showed (the desktop has no such rule, which is why it
+signed in from here). GameNative notes the same thing beside its own connect call. `SignIn` and `openConnection` now move all of their work to the IO threads,
+whoever calls them. The sign-in also names the device ("Persona on <model>") and presents itself as a Windows client, as GameNative's does.
+
 Connecting (`openConnection`, `CmDirectory`): web servers on **port 443** first, from the service's own server list (with a built-in list of host names when the
 list can't be fetched), six tries of six seconds, then the direct route. The library's own pick often lands on ports 27017 to 27019, which mobile and public
 networks block, so it is not used first. When nothing connects, the dialog says how each server failed. The whole story (the library's log lines and the

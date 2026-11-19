@@ -89,7 +89,7 @@ object InstallCenter {
     /** Null when signed in; otherwise why not, in words. Errors included: a failing library must not hide. [preferCode] asks for a typed code even where approving in the app is possible. */
     suspend fun signIn(context: Context, username: String, password: CharArray, preferCode: Boolean = false): String? = logged(context) {
       try {
-        SignIn(KeystoreLoginStore(context)).signIn(username, password, object : GuardPrompt {
+        SignIn(KeystoreLoginStore(context), deviceName()).signIn(username, password, object : GuardPrompt {
             override suspend fun code(kind: GuardKind, previousWasWrong: Boolean): String? {
                 val request = CodeRequest(kind, previousWasWrong, CompletableDeferred())
                 _code.value = request
@@ -102,7 +102,7 @@ object InstallCenter {
 
     /** Signing in by approving a link (shown as a QR code, or opened in the Steam app): [onLink] gets the link, and again when it is renewed. Null when signed in. */
     suspend fun signInWithApproval(context: Context, onLink: (String) -> Unit): String? = logged(context) {
-        SignIn(KeystoreLoginStore(context)).signInWithApproval(onLink)
+        SignIn(KeystoreLoginStore(context), deviceName()).signInWithApproval(onLink)
     }
 
     private fun describe(t: Throwable): String {
@@ -120,6 +120,9 @@ object InstallCenter {
             }
         }
     }
+
+    /** What the account's list of signed-in devices shows for this phone. */
+    private fun deviceName(): String = "Persona on ${android.os.Build.MODEL ?: "Android"}"
 
     fun isSignedIn(context: Context): Boolean = SignIn(KeystoreLoginStore(context)).isSignedIn()
 

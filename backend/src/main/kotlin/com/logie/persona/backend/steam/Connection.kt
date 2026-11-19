@@ -90,7 +90,7 @@ internal class Connection(val protocol: ProtocolTypes = ProtocolTypes.TCP) : Clo
  * networks nearly always let through, and the library's own pick often lands on a port they block (27017 to 27019). Then the direct route as the library chooses.
  * When none gets through, the message says how each failed.
  */
-internal suspend fun openConnection(perServerMs: Long = 6_000, webServers: Int = 6, directTries: Int = 2): Connection {
+internal suspend fun openConnection(perServerMs: Long = 6_000, webServers: Int = 6, directTries: Int = 2): Connection = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     val failures = LinkedHashSet<String>()
     suspend fun attempt(protocol: ProtocolTypes, server: ServerRecord?, label: String): Connection? {
         val c = Connection(protocol)
@@ -100,7 +100,7 @@ internal suspend fun openConnection(perServerMs: Long = 6_000, webServers: Int =
     }
     val lookup = CmDirectory.lookup()
     lookup.note?.let { failures += "server list: $it" }
-    for (server in lookup.servers.take(webServers)) attempt(ProtocolTypes.WEB_SOCKET, server, "web ${server.endpoint.hostString}")?.let { return it }
-    repeat(directTries) { attempt(ProtocolTypes.TCP, null, "direct")?.let { return it } }
+    for (server in lookup.servers.take(webServers)) attempt(ProtocolTypes.WEB_SOCKET, server, "web ${server.endpoint.hostString}")?.let { return@withContext it }
+    repeat(directTries) { attempt(ProtocolTypes.TCP, null, "direct")?.let { return@withContext it } }
     throw java.io.IOException("Could not reach the service. " + failures.take(4).joinToString("; "))
 }

@@ -1,0 +1,1 @@
+Signing in to Steam works from the phone: it no longer fails with "No CM servers available".
