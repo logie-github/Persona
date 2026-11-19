@@ -118,7 +118,7 @@ function tap(i) {
   if (i === state.selected) { const e = state.entries[i]; if (e && e.enabled !== false) bridge('activate', i); }
   else { select(i); bridge('select', i); }
 }
-function select(i) { if (i === state.selected) return; state.selected = i; nudgeVel = 6; $('caption').textContent = (state.entries[i]?.hint || ''); }
+function select(i) { if (i === state.selected) return; state.selected = i; nudgeVel = 6; }
 function bridge(kind, i) { try { window.Android && window.Android[kind] && window.Android[kind](i); } catch (e) {} window.dispatchEvent(new CustomEvent('skin-' + kind, { detail: i })); }
 let dragY = null;
 addEventListener('pointerdown', (e) => { dragY = e.clientY; });
@@ -142,12 +142,10 @@ function drawTitle() {
     const x = 1040, y = 400, w = 420, h = 60, f = Math.max(0, Math.min(1, state.progress.fraction));
     mk('polygon', { points: `${x + 30},${y} ${x + w},${y} ${x + w - 30},${y + h} ${x},${y + h}`, fill: 'rgba(42,16,65,.5)' }, gg);
     const fx = x + w * f; mk('polygon', { points: `${x + 30},${y} ${Math.max(x + 30, fx)},${y} ${Math.max(x, fx - 30)},${y + h} ${x},${y + h}`, fill: C.gold }, gg);
-    const gl = glyphs(state.progress.text.toUpperCase(), 'Archivo'); const tw = Math.min(260, 40 * gl.aspect);
-    mk('path', { d: pathOf(gl.contours, { TL: [x, y - 56], TR: [x + tw, y - 56], BL: [x, y - 16], BR: [x + tw, y - 16], bow: 0 }), fill: C.ink }, gg);
   }
 }
 window.Skin = {
-  setState(s) { Object.assign(state, s); buildWords(); pos = state.selected; drawTitle(); $('caption').textContent = (state.entries[state.selected]?.hint || ''); draw(); },
+  setState(s) { Object.assign(state, s); buildWords(); pos = state.selected; drawTitle(); draw(); },
   select(i) { select(i); },
   setGirlVideo(url) { const v = $('girl-video'); v.src = url; v.style.display = ''; $('girl').style.display = 'none'; v.play().catch(() => {}); },
 };
@@ -183,7 +181,7 @@ if (q.get('mock')) {
     p3: [['PLAY', 'Start the game'], ['UNINSTALL', 'Take the game off this phone; saves are kept'], ['VERSION', 'Change version: Portable'], ['MODS', 'Add or remove mods'], ['OPTIONS', 'Graphics, controls and launch options']],
   };
   const set = sets[q.get('set') || 'p3'];
-  window.Skin.setState({ game: { title: q.get('title') || 'Persona 3', version: q.get('ver') || 'Portable' }, selected: sel, entries: set.map(([label, hint, ok]) => ({ label, hint, enabled: ok !== false })), progress: q.get('p') ? { text: 'Installing', fraction: 0.62 } : null });
+  window.Skin.setState({ game: { title: q.get('title') || 'Persona 3', version: q.get('ver') || 'Portable' }, selected: sel, entries: set.map(([label, , ok]) => ({ label, enabled: ok !== false })), progress: q.get('p') ? { text: 'Installing', fraction: 0.62 } : null });
 }
 let last = performance.now() / 1000; const t0 = last;
 function frame() {

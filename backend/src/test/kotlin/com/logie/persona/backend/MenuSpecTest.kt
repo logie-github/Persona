@@ -44,11 +44,4 @@ class MenuSpecTest {
             assertTrue(OptionId.UNINSTALL in ids(g.id, v.id, true), v.id)
         }
     }
-
-    @Test fun discGamesAskForTheDiscAndEmulatorOptions() {
-        val v = Catalog.findVersion("persona1_ps1")!!
-        val opts = MenuSpec.optionsFor(Catalog.all[0], v, installed = false)
-        assertEquals("Add your disc image", opts.first { it.id == OptionId.INSTALL }.hint)
-        assertEquals("Emulator options", opts.first { it.id == OptionId.OPTIONS }.hint)
-    }
 }
