@@ -128,7 +128,7 @@ addEventListener('pointerup', () => { dragY = null; });
 // ---------- the title block (the picture's "MOON PHASE FULL") and the install gauge ----------
 function drawTitle() {
   const g = $('title'); g.innerHTML = '';
-  const lines = state.game.title.toUpperCase().split(' '); let y = 18;
+  const lines = (state.game.lines || state.game.title.split(' ')).map((t) => t.toUpperCase()); let y = 18;
   lines.forEach((t) => {
     const gl = glyphs(t, 'Bungee'); const h = 112, w = Math.min(430, h * gl.aspect);
     mk('path', { d: pathOf(gl.contours, { TL: [1040, y], TR: [1040 + w, y], BL: [1040, y + h], BR: [1040 + w, y + h], bow: 0 }), fill: C.white }, g); y += h + 14;
@@ -176,12 +176,12 @@ const q = new URLSearchParams(location.search);
 if (q.get('mock')) {
   const sel = +(q.get('sel') || 1);
   const sets = {
-    p1: [['PLAY', 'Install it first', false], ['INSTALL', 'Add your disc image'], ['VERSION', 'Change version: Shin Megami Tensei: Persona (PSP)'], ['OPTIONS', 'Emulator options']],
+    p1: [['PLAY', '', false], ['INSTALL', ''], ['OPTIONS', '']],
     p4: [['PLAY', 'Start the game'], ['UNINSTALL', 'Take the game off this phone; saves are kept'], ['MODS', 'Add or remove mods'], ['OPTIONS', 'Graphics, controls and launch options']],
     p3: [['PLAY', 'Start the game'], ['UNINSTALL', 'Take the game off this phone; saves are kept'], ['VERSION', 'Change version: Portable'], ['MODS', 'Add or remove mods'], ['OPTIONS', 'Graphics, controls and launch options']],
   };
   const set = sets[q.get('set') || 'p3'];
-  window.Skin.setState({ game: { title: q.get('title') || 'Persona 3', version: q.get('ver') || 'Portable' }, selected: sel, entries: set.map(([label, , ok]) => ({ label, enabled: ok !== false })), progress: q.get('p') ? { text: 'Installing', fraction: 0.62 } : null });
+  window.Skin.setState({ game: { title: q.get('title') || 'Persona 3', lines: q.get('lines') ? q.get('lines').split('|') : undefined, version: q.get('ver') || 'Portable' }, selected: sel, entries: set.map(([label, , ok]) => ({ label, enabled: ok !== false })), progress: q.get('p') ? { text: 'Installing', fraction: 0.62 } : null });
 }
 let last = performance.now() / 1000; const t0 = last;
 function frame() {

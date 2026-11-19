@@ -28,16 +28,20 @@ data class Version(
 }
 
 /** A box on the shelf. */
-data class Game(val id: String, val number: Int, val title: String, val versions: List<Version>) {
+data class Game(
+    val id: String, val number: Int, val title: String, val versions: List<Version>,
+    /** How the title breaks into lines on the box's screen (the box's name when it fits on one). */
+    val lines: List<String> = title.split(' '),
+) {
     val default: Version get() = versions.first()
 }
 
 object Catalog {
     val all: List<Game> = listOf(
-        Game("persona1", 1, "Persona", listOf(
-            Version("persona1_psp", "Shin Megami Tensei: Persona (PSP)", 2009, Origin.DISC_IMAGE, Runtime.PSP_EMULATOR),
-            Version("persona1_ps1", "Revelations: Persona (PS1)", 1996, Origin.DISC_IMAGE, Runtime.PS1_EMULATOR),
-        )),
+        // Persona 1 is Shin Megami Tensei: Persona, the PSP version only.
+        Game("persona1", 1, "Shin Megami Tensei: Persona", listOf(
+            Version("persona1_psp", "PSP", 2009, Origin.DISC_IMAGE, Runtime.PSP_EMULATOR),
+        ), lines = listOf("Shin Megami", "Tensei", "Persona")),
         Game("persona2", 2, "Persona 2", listOf(
             Version("persona2_is_psp", "Innocent Sin (PSP)", 2011, Origin.DISC_IMAGE, Runtime.PSP_EMULATOR),
             Version("persona2_ep_ps1", "Eternal Punishment (PS1)", 2000, Origin.DISC_IMAGE, Runtime.PS1_EMULATOR),

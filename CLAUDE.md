@@ -7,8 +7,8 @@ recipe numbers, patch notes). Many Blizzard rules carry over; the ones that matt
   button, status line, log line shown to the player or report names the store: a game says "Install", "Installing", a step and a
   fraction. Downloads and installs run on the backend (`backend/steam`, a foreground service in the app) from the saved
   refresh token. The sign-in screen returns only when the saved sign-in is refused (`SignInRequired`). The password is never kept.
-- **Five boxes**: Persona 1 to 5 (`backend/catalog`). Boxes 1 and 2 are not on Steam: the person's own disc images through
-  emulators. Persona 3 has Portable and Reload, Persona 5 has Royal, Strikers and Tactica, as version choosers.
+- **Five boxes**: Persona 1 to 5 (`backend/catalog`). Box 1 is *Shin Megami Tensei: Persona*, the PSP version only (the user: "I only want
+  the psp version"). Boxes 1 and 2 are not on Steam: the person's own disc images through emulators. Persona 3 has Portable and Reload, Persona 5 has Royal, Strikers and Tactica, as version choosers.
 - **Mods and touch controls** are first-class: a gamepad overlay per game with saved layouts, and a mod manager that keeps
   original files apart so Reset and Repair restore them.
 - `README.md` is the manual: keep it current with every change.

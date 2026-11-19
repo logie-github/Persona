@@ -13,7 +13,7 @@ the sign-in and downloads have not been tried against a real account.
 
 | Box | Versions | Comes from | Runs on |
 | --- | --- | --- | --- |
-| Persona | PSP, PS1 | your own disc image | emulator |
+| Shin Megami Tensei: Persona (Persona 1) | PSP only | your own disc image | PSP emulator |
 | Persona 2 | Innocent Sin (PSP), Eternal Punishment (PS1) | your own disc image | emulator |
 | Persona 3 | Portable, Reload | downloaded by the app | Winlator |
 | Persona 4 | Golden | downloaded by the app | Winlator |

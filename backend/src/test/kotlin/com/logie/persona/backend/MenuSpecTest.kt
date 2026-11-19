@@ -31,6 +31,14 @@ class MenuSpecTest {
         assertFalse(OptionId.VERSION in ids("persona4", "persona4_golden", true))     // Golden only
     }
 
+    @Test fun personaOneIsTheShinMegamiTenseiPspGameOnly() {
+        val g = Catalog.all.first { it.id == "persona1" }
+        assertEquals("Shin Megami Tensei: Persona", g.title)
+        assertEquals(listOf("persona1_psp"), g.versions.map { it.id })
+        assertEquals(listOf(OptionId.PLAY, OptionId.INSTALL, OptionId.OPTIONS), ids("persona1", "persona1_psp", false))
+        assertEquals(listOf("Shin Megami", "Tensei", "Persona"), g.lines)
+    }
+
     @Test fun modsOnlyOnPcVersions() {
         assertFalse(OptionId.MODS in ids("persona1", "persona1_psp", true))           // emulator games
         assertFalse(OptionId.MODS in ids("persona2", "persona2_ep_ps1", true))
