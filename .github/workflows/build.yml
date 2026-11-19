@@ -36,7 +36,14 @@ jobs:
           command -v 7z > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full > /dev/null; }
           scripts/prepare-steamemu.sh
       # Release build, signed with the app's own key so each release installs over the last.
-      - run: ./gradlew :backend:test :app:testDebugUnitTest :app:assembleRelease -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
+      - name: Build and test
+        env:
+          # The reports' token (Issues: read and write on this repository), built into the app as the Blizzard launcher's is.
+          PERSONA_REPORT_TOKEN: ${{ secrets.PERSONA_REPORT_TOKEN }}
+        run: >
+          ./gradlew :backend:test :app:testDebugUnitTest :app:assembleRelease
+          -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
+          -PpersonaReportToken="$PERSONA_REPORT_TOKEN"
       - run: cp app/build/outputs/apk/release/app-release.apk Persona.apk
       - uses: actions/upload-artifact@v4
         with: { name: Persona, path: Persona.apk }

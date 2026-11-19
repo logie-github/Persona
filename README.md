@@ -192,8 +192,8 @@ Patches (`patches/winlator`): 0001 the runtime in the app's data folder and leav
 app's R isn't final); 0003 the runtime installed without Winlator's screens; 0004 the program's arguments apart from its path; 0005 no window picture without
 a GL context (a crash fix); 0006 a game started with on-screen controls (`controls_profile`) and full-screen windows (`force_fullscreen`); 0007 the session's programs' output (Wine, Box64, the game)
 written to the file named by the `session_log` extra; 0008 the session's own events in that log (`[persona]` lines: the command started with
-its graphics driver, Direct3D layer and Box64 preset, the status its program ended with, the game screen closing). 0001 to 0005 are the Blizzard
-launcher's.
+its graphics driver, Direct3D layer and Box64 preset, the status its program ended with, the game screen closing); 0009 the player's Exit from
+Winlator's menu noted there (a session that ends without it ended by itself). 0001 to 0005 are the Blizzard launcher's.
 
 PLAY (`windows/WindowsRuntime`): installs the runtime the first time (a gauge on the game's screen), makes the games' Windows once (one container,
 "Persona", the games' folder as drive D:), finds the game's program (`GameExe`: P4G.exe, P3P.exe, P3R.exe, P5R.exe... else the largest program that isn't an
@@ -221,3 +221,24 @@ off (it repeats its settings for every program). When there are logs, the game's
 Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`), the log digest (`LogDigestTest`). The
 ticket request has not been run against the service (it needs a signed-in account that owns the game). Not run on a phone:
 whether Persona 4 Golden starts and plays under Winlator on the Fold has not been seen.
+
+## Reports: crashes sent as issues
+
+The app's failures go to this repository as GitHub issues by themselves (labels `bug`, `auto-report`), as the Blizzard launcher's do (`reports/Reports`,
+`backend/reports/Issues`):
+
+- **A Windows game's session that ends by itself**: Winlator's game screen closes, its program ended (patch 0008) without the player's Exit (patch
+  0009), within five minutes of PLAY or with a failing status. The issue holds SHARE LOG's short report (notes, how Android says the app ended, the
+  session log's digest) and, as comments, the end of the session's whole log. The game's screen says "It closed while starting" and that a report goes.
+- **The app crashing**: a Java crash (its stack, written as the process ends, sent at the next start); a native crash, an ANR, Android ending the app
+  (ApplicationExitInfo, read at the next start: a native crash's tombstone as its readable words), with the Windows logs when a game's session ran
+  just before.
+- **PLAY failing** before the game's screen (the runtime, the games' Windows, the game's program): its stack.
+
+Each is written to `files/reports` first and sent at once, then every minute while any wait (offline, GitHub busy), kept until GitHub takes it; a
+step that failed goes on from where it stopped (the issue is opened once). The same failure of the same build goes once a day; a new build reports
+again. A report never names the account (its name is replaced by `<account>`) or the store (its name reads "store": the emulator's libraries appear
+as `store_api64.dll`); SHARE LOG's text and file are the same.
+
+The token is built in from CI's **`PERSONA_REPORT_TOKEN`** secret (a fine-grained token with Issues: read and write on this repository only), as
+the Blizzard launcher carries `BLIZZ_REPORT_TOKEN`. A build without it keeps its reports on the phone and sends nothing; SHARE LOG still works.

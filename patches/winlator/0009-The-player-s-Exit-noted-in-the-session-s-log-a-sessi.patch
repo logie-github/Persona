@@ -1,0 +1,25 @@
+From 3230acd3adfbab541a2611590c4eca3c300380c8 Mon Sep 17 00:00:00 2001
+From: persona <persona@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 20:01:49 +0000
+Subject: [PATCH] The player's Exit noted in the session's log (a session that
+ ends without it ended by itself)
+
+---
+ app/src/main/java/com/winlator/XServerDisplayActivity.java | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/app/src/main/java/com/winlator/XServerDisplayActivity.java b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+index cc1d8bf..b8e4ea0 100644
+--- a/app/src/main/java/com/winlator/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+@@ -417,6 +417,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         } else if (id == R.id.menu_item_touchpad_help) {
+             showTouchpadHelpDialog();
+         } else if (id == R.id.menu_item_exit) {
++            personaNote("the player chose Exit");
+             exit();
+         }
+         return true;
+-- 
+2.43.0
+

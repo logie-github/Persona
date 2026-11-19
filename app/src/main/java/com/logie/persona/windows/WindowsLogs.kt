@@ -40,13 +40,22 @@ object WindowsLogs {
         if (Build.VERSION.SDK_INT < 30) return "(Android 11 or newer only)"
         val infos = runCatching { context.getSystemService(ActivityManager::class.java)?.getHistoricalProcessExitReasons(context.packageName, 0, max) }.getOrNull().orEmpty()
         if (infos.isEmpty()) return "(none)"
-        return infos.joinToString("\n") { i ->
-            val head = "${java.util.Date(i.timestamp)} ${reason(i.reason)} status ${i.status}, ${i.processName}, pss ${i.pss / 1024} MB" +
-                (i.description?.let { ", $it" } ?: "")
-            val trace = if (i.reason == ApplicationExitInfo.REASON_CRASH_NATIVE || i.reason == ApplicationExitInfo.REASON_ANR) traceText(i) else ""
-            if (trace.isEmpty()) head else "$head\n$trace"
-        }
+        return infos.joinToString("\n") { exitText(it) }
     }
+
+    @androidx.annotation.RequiresApi(30)
+    fun exitLine(i: ApplicationExitInfo): String = "${java.util.Date(i.timestamp)} ${reason(i.reason)} status ${i.status}, ${i.processName}, pss ${i.pss / 1024} MB" +
+        (i.description?.let { ", $it" } ?: "")
+
+    /** One end: its line, and a native crash's or an ANR's readable words. */
+    @androidx.annotation.RequiresApi(30)
+    fun exitText(i: ApplicationExitInfo): String {
+        val trace = if (i.reason == ApplicationExitInfo.REASON_CRASH_NATIVE || i.reason == ApplicationExitInfo.REASON_ANR) traceText(i) else ""
+        return if (trace.isEmpty()) exitLine(i) else "${exitLine(i)}\n$trace"
+    }
+
+    @androidx.annotation.RequiresApi(30)
+    fun reasonName(r: Int): String = reason(r)
 
     /** A native crash's tombstone (or an ANR's dump) as its readable words: the signal, the abort message, the libraries and functions of the stack. */
     @androidx.annotation.RequiresApi(30)
@@ -107,13 +116,16 @@ object WindowsLogs {
         append("== windows-session.log.1 (the start before) ==\n").append(tail(read(File(session(context).path + ".1")), 1_000_000)).append('\n')
     }
 
+    private fun redact(context: Context, text: String) =
+        com.logie.persona.backend.reports.Issues.redact(text, runCatching { com.logie.persona.install.InstallCenter.accountName(context) }.getOrNull())
+
     fun share(context: Context) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_SUBJECT, "Persona: Windows game log")
-            .putExtra(Intent.EXTRA_TEXT, report(context))
+            .putExtra(Intent.EXTRA_TEXT, redact(context, report(context)))
         runCatching {
             val dir = File(context.cacheDir, "logs").also { it.mkdirs() }
-            val file = File(dir, "persona-windows-log.txt").also { it.writeText(full(context)) }
+            val file = File(dir, "persona-windows-log.txt").also { it.writeText(redact(context, full(context))) }
             val uri = FileProvider.getUriForFile(context, context.packageName + ".filesprovider", file)
             send.putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             send.clipData = android.content.ClipData.newRawUri("log", uri)

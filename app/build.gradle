@@ -36,6 +36,9 @@ android {
 		// Updates come from this repository's releases (persona-build-N, N being the version code).
 		buildConfigField "String", "UPDATE_REPO", "\"${prop('personaUpdateRepo', 'logie-github/Persona')}\""
 		buildConfigField "String", "RELEASE_TAG_PREFIX", "\"persona-build\""
+		// The token the app's reports open issues with (Issues: read and write on this repository): CI's PERSONA_REPORT_TOKEN secret,
+		// as the Blizzard launcher carries its own. Empty in a build without it: reports then wait on the phone.
+		buildConfigField "String", "REPORT_TOKEN", "\"${prop('personaReportToken', '')}\""
 		ndk { abiFilters "arm64-v8a" }
 		// Winlator's C is written for an older NDK's compiler; this one's newer errors for old C are warnings again.
 		externalNativeBuild { cmake { cFlags '-Wno-error=implicit-function-declaration', '-Wno-error=incompatible-function-pointer-types', '-Wno-error=int-conversion' } }

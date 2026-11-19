@@ -1,20 +1,15 @@
 package com.logie.persona
 
 import android.app.Application
-import java.io.File
+import com.logie.persona.reports.Reports
 
-/** The app's process: a crash anywhere in it (the launcher, the Windows game's screen) is written to files/crash.log before Android ends it, for SHARE LOG. */
+/**
+ * The app's process: a crash anywhere in it (the launcher, the Windows game's screen) is written to files/crash.log for SHARE LOG and
+ * reported as an issue, as are the other ways a run can fail ([Reports]).
+ */
 class PersonaApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        val previous = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
-            runCatching {
-                val f = File(filesDir, "crash.log")
-                if (f.length() > 512 * 1024) f.delete()
-                f.appendText("${java.util.Date()} ${android.os.Process.myPid()} ${thread.name}: ${e.stackTraceToString()}\n")
-            }
-            previous?.uncaughtException(thread, e)
-        }
+        Reports.start(this)
     }
 }

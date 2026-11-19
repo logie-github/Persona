@@ -53,9 +53,14 @@ object WindowsRuntime {
     /** On an Adreno GPU DXVK names a desktop card the games know, the same at every start (the Blizzard launcher's choice). */
     private const val DESKTOP_CARD = "73bf:1002:AMD Radeon RX 6800 XT"
 
-    /** When the last game was started (SHARE LOG says so). */
+    /** When the last game was started (SHARE LOG says so), and which (the reports name it). */
     @Volatile var lastStart: Long? = null
         private set
+    @Volatile var lastGame: String? = null
+        private set
+
+    /** The game's session ended by itself ([com.logie.persona.reports.Reports]): its screen says so. */
+    fun closedByItself(versionId: String, message: String) { _state.value = State.Failed(versionId, message) }
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state
@@ -75,6 +80,7 @@ object WindowsRuntime {
                 // (also an Error: Winlator's native libraries failing to load is an UnsatisfiedLinkError)
                 runCatching { File(app.filesDir, "windows.log").appendText("${java.util.Date()} ${version.id}: ${e.stackTraceToString()}\n") }
                 _state.value = State.Failed(version.id, e.message ?: e.javaClass.simpleName)
+                com.logie.persona.reports.Reports.playFailed(app, version.id, e)
             }
         }
     }
@@ -105,7 +111,7 @@ object WindowsRuntime {
             emuDir(context)?.let { emu ->
                 SteamEmu.prepare(dir, version.appId ?: 0, emu, ticket?.accountName ?: InstallCenter.accountName(context) ?: "Persona", ticket?.steamId64 ?: 0, ticket?.ticketBase64)
             }
-            log(context, "${version.id}: ${exe.name}${if (SteamEmu.isSteamStubbed(exe)) " (wrapped by Steam's DRM: it may not start without the Steam client)" else ""}")
+            log(context, "${version.id}: ${exe.name}${if (SteamEmu.isSteamStubbed(exe)) " (a wrapped program, .bind: it may not start without its store's client)" else ""}")
         }
 
         _state.value = State.Preparing(version.id, Step.STARTING)
@@ -114,7 +120,7 @@ object WindowsRuntime {
             // Box64's own log off, as the Blizzard launcher has it: it repeats its settings for every program Wine starts and slows a start.
             .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 0).apply()
         val sessionLog = withContext(Dispatchers.IO) { WindowsLogs.newSession(context) }
-        lastStart = System.currentTimeMillis()
+        lastStart = System.currentTimeMillis(); lastGame = version.id
         log(context, "${version.id}: starting ${exe.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()})")
         val intent = Intent(context, XServerDisplayActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

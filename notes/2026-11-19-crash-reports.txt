@@ -1,0 +1,1 @@
+When a game closes by itself at start or the app crashes, a report with its log is sent by itself.
