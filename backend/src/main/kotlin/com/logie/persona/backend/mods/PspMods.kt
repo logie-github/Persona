@@ -66,7 +66,7 @@ class PspMods(val dir: File, private val discId: String, private val isoFile: Fi
                 Part.TEXTURES -> File(texDir, f.dest)
                 Part.CHEATS -> { cheats = true; File(modDir, "cheats.ini") }
                 Part.DISC_FILE -> File(modDir, "disc/${f.dest}")
-                Part.EBOOT_PATCH -> File(modDir, "patch/${patchNames.size}.xdelta").also { patchNames += f.dest }
+                Part.DISC_PATCH -> File(modDir, "patch/${patchNames.size}.xdelta").also { patchNames += f.dest }
             }
         }, onBytes)
         val tex = files.values.any { it.part == Part.TEXTURES }
@@ -89,7 +89,10 @@ class PspMods(val dir: File, private val discId: String, private val isoFile: Fi
     fun rebuild() {
         val on = list().filter { it.enabled }
         // textures: one textures.ini over every pack that is on, each pack in its own folder
-        val packs = on.filter { it.textures }.mapNotNull { m -> File(textures, "m${m.id}/textures.ini").takeIf { it.isFile }?.let { "m${m.id}" to it.readText() } }
+        val packs = on.filter { it.textures }.mapNotNull { m ->
+            val dir = File(textures, "m${m.id}").takeIf { it.isDirectory } ?: return@mapNotNull null
+            TextureIni.Pack("m${m.id}", File(dir, "textures.ini").takeIf { it.isFile }?.readText(), dir.walkTopDown().filter { it.isFile }.map { it.relativeTo(dir).path.replace('\\', '/') }.toList())
+        }
         val merged = File(textures, "textures.ini")
         if (packs.isNotEmpty()) { textures.mkdirs(); merged.writeText(TextureIni.merge(packs)) } else merged.delete()
         // cheats: the lists joined, the header lines of all but the first dropped

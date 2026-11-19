@@ -99,7 +99,8 @@ fun ModsScreen(onDismiss: () -> Unit) {
             busy = "Opening ${mod.name}"; message = null
             runCatching { withContext(Dispatchers.IO) { gb.profile(mod.id) } }
                 .onSuccess { p ->
-                    val files = p.files.filter { it.url.isNotBlank() }
+                    // a RAR can't be opened yet: where the mod also has a zip or 7z, those are what is offered
+                    val files = p.files.filter { it.url.isNotBlank() }.let { all -> all.filter { !it.name.endsWith(".rar", true) }.ifEmpty { all } }
                     when { files.isEmpty() -> message = "That mod has no file to download."; files.size == 1 -> download(p, files[0]); else -> choice = Choice.OneFile(p, files) }
                 }
                 .onFailure { message = it.message ?: "Couldn't open that mod." }

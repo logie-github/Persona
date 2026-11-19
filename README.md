@@ -123,6 +123,12 @@ dependency). None of PPSSPP's own screens are shown; its settings are the launch
   patches in xdelta form, applied by `Vcdiff`); `PspMods` installs, switches and removes them under the game's memory stick
   (`PSP/TEXTURES/<id>/m<modId>/` with a merged `textures.ini`, `PSP/Cheats/<id>.ini`, `mods/m<id>/`) and rebuilds a patched copy of the game from
   the untouched image when a mod changes disc files, so removing a mod restores the original.
+  Checked against real archives from the site (`LiveModsTest`, `RealModsTest`): packs of pictures named by their texture hash with no textures.ini (one folder per
+  choice, e.g. the PS5 buttons) are offered as choices and listed in the merged textures.ini (PPSSPP only finds hash-named files by itself in the texture folder's
+  own root, and refuses an ini that names no hash type, so the merged one always does); a mod made for several releases (folders or file names marked US, PAL, JP)
+  keeps only this disc's files; an xdelta patch goes to the disc file of the same name (`SE_BOX.xdelta` to `SE_BOX.*`, `ENDALL_Patch_US.xdelta` to `ENDALL.*`), not
+  only to EBOOT.BIN. RAR archives (RAR5, about one file in twelve on the site) can't be opened yet: where a mod also has a zip or 7z, that is offered instead.
+  Loose pictures with names of their own and raw game files (`.gim`) have no place without the author's instructions and are listed as skipped.
 - **Touch** (`backend/.../touch/Gestures`, a pure state machine with explicit time): a held swipe anywhere is the d-pad or left stick; one swipe left or
   right is L1 or R1; a held tap is Circle (it combines with a held swipe to run); one tap is Cross; a double tap is Triangle; a swipe in from the right
   edge is Start; a tap followed by a held tap is one press of Square; a tap with two fingers opens the menu below. PPSSPP's own on-screen buttons are turned off.
