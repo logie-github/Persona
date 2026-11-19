@@ -1,5 +1,13 @@
 package com.logie.persona.ui
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import com.logie.persona.art.ArtStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,6 +60,8 @@ fun Launcher() {
         val states by InstallCenter.state.collectAsState()
         LaunchedEffect(Unit) { InstallCenter.refresh(context, Catalog.all.flatMap { it.versions }) }
         var signIn by remember { mutableStateOf<Version?>(null) }
+        var artFor by remember { mutableStateOf<Game?>(null) }
+        var artRevision by remember { mutableStateOf(0) }
         // Each time the app comes to the front: look for a newer build, fetch it and open Android's installer.
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { Updater.retryInstall(context); Updater.checkAndInstall(context) }
         val update by Updater.state.collectAsState()
@@ -65,7 +75,11 @@ fun Launcher() {
                     UpdateBar(update) { Updater.retryInstall(context) }
                     Spacer(Modifier.height(16.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
-                        items(Catalog.all) { g -> Box(g, g == selected) { selected = g; open = g } }
+                        items(Catalog.all) { g ->
+                            val shown = Catalog.findVersion(versionIds[g.id]) ?: g.default
+                            Box(g, g == selected, art = remember(artRevision, shown.id) { ArtStore.box(context, shown.id)?.let { f -> BitmapFactory.decodeFile(f.path) } },
+                                onLongClick = { artFor = g }) { selected = g; open = g }
+                        }
                     }
                 }
             } else {
@@ -77,8 +91,11 @@ fun Launcher() {
                 if (game.number == 1) PersonaOneScreen(game, version, state, update)
                 else PlainGameScreen(game, version, state, update, onVersion = { versionIds[game.id] = it.id })
                 if (state.options) PspOptionsDialog(state.closeOptions)
+                if (state.openMods) ModsScreen(state.closeMods)
             }
         }
+        // A long press on a box: its box art, per version.
+        artFor?.let { g -> BoxArtDialog(g, Catalog.findVersion(versionIds[g.id]) ?: g.default, onChanged = { artRevision++ }, onDismiss = { artFor = null }) }
         // The one place the store is named: its sign-in, shown once.
         signIn?.let { v -> SignInDialog(onDone = { ok -> signIn = null; if (ok) InstallService.start(context, v.id) }) }
         LaunchedEffect(states) {
@@ -126,15 +143,17 @@ private fun PlainGameScreen(game: Game, version: Version, state: GameState, upda
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Box(game: Game, selected: Boolean, onClick: () -> Unit) {
+private fun Box(game: Game, selected: Boolean, art: Bitmap?, onLongClick: () -> Unit, onClick: () -> Unit) {
     val colors = boxColors.getValue(game.number)
     Box(
         Modifier.width(if (selected) 132.dp else 112.dp).aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(8.dp)).background(Brush.verticalGradient(colors)).clickable(onClick = onClick),
+            .clip(RoundedCornerShape(8.dp)).background(Brush.verticalGradient(colors)).combinedClickable(onLongClick = onLongClick, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(game.number.toString(), fontSize = 64.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = if (selected) 1f else 0.6f))
+        if (art != null) Image(art.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else Text(game.number.toString(), fontSize = 64.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = if (selected) 1f else 0.6f))
     }
 }
 

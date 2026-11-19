@@ -132,9 +132,17 @@ dependency). None of PPSSPP's own screens are shown; its settings are the launch
   per-game ones on RESTART and the renderer (Vulkan or OpenGL) at the next start from the launcher.
 - Nothing of this has run on a phone. The PPSSPP native library builds for arm64 here (about 220 MB unstripped); the gestures, disc reading,
   options and mod planning are unit-tested; the app compiles and links with the emulator's Java and resources. Not verified: the gestures on a real screen, the
-  emulator accepting the key codes and the pause key, the restart message, and the edge-swipe exclusion. The MODS screen is not written yet.
+  emulator accepting the key codes and the pause key, the restart message, and the edge-swipe exclusion. The MODS screen (`ui/ModsScreen`) lists the most downloaded mods of game 12961 or a search, asks which file or texture pack when there is a choice, downloads, installs, and lists what is installed with a switch and REMOVE; its calls were checked against the live GameBanana API from here (list and profile shapes, e.g. mod 309876 has two zips of about 200 MB), not on a phone.
 
 ## The app's icon
 
 `branding/igor.jpg` with a white blocky P in the lower right, as an adaptive icon (`app/src/main/res/drawable-nodpi/ic_launcher_*.png`,
 `mipmap-anydpi-v26`) and legacy PNGs. The P stays inside the middle 66% so round masks keep it whole.
+
+## Box art
+
+A long press on a box on the shelf opens BOX ART (`ui/ArtDialogs`): each version of a game has its own picture. SteamGridDB (`backend/.../art/SteamGrid`, ported from Blizzard:
+search the game by title and version, a grid of its box pictures, a tap downloads one; only steamgriddb.com addresses are fetched), MY FILES (the phone's picker), then
+a crop to the box's 2:3 shape (drag, pinch or slide; `CropMath`, tested) and the result is kept as `files/art/<version>-box.jpg` (the source stays in `art-src` so CROP can adjust it later).
+RESET puts the numbered box back. The SteamGridDB key is asked for in the picker the first time and kept in the app's preferences (the KEY button forgets it); it is sent only to steamgriddb.com.
+Not yet ported from Blizzard: the music picker, the loading screen maker and the icon picker.
