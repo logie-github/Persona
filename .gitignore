@@ -1,0 +1,10 @@
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+app/winlator/
+app/tools/
+build/
+__pycache__/

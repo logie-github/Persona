@@ -1,0 +1,13 @@
+plugins { id 'org.jetbrains.kotlin.jvm' }
+
+
+dependencies {
+	// Steam's protocol client and its depot downloader (Kotlin/Java, no Steam client program needed).
+	api 'in.dragonbra:javasteam:1.8.0'
+	api 'in.dragonbra:javasteam-depotdownloader:1.8.0'
+	api 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+	implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2'
+	testImplementation 'org.jetbrains.kotlin:kotlin-test-junit:2.3.21'
+}
+
+test { useJUnit() }
