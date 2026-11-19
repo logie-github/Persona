@@ -1,6 +1,5 @@
 pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
 rootProject.name = 'Persona Launcher'
-// :backend is plain Kotlin/JVM (the catalog and the headless Steam installer) so it builds and tests anywhere;
-// :app (the Android launcher on Winlator) joins it once the shell is copied over from Blizzard.
-include ':backend'
+// :backend is plain Kotlin/JVM (the catalog and the headless installer); :app is the Android launcher.
+include ':backend', ':app'

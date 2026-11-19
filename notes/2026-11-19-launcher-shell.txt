@@ -1,0 +1,1 @@
+Persona: the app now shows the five boxes and installs your games in the background after one sign-in.

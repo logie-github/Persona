@@ -4,8 +4,10 @@ An Android launcher for the Persona games, built like the Blizzard launcher (`lo
 a patched Winlator (Wine and Box64) for the Windows games, touch controls, mods, and install and repair handled by the app.
 Made for the Galaxy Z Fold.
 
-**Status: backend only.** The catalog and the headless installer exist and are unit tested; the Android shell (copied from
-Blizzard's), the runtime, the touch overlay and the mod manager are not built yet. Nothing here has run on a phone.
+**Status: launcher shell and installer.** The Android app builds (debug APK, `com.logie.persona`): a shelf of five boxes with
+version chooser, a one-time sign-in, and background installs through a foreground service. Not built yet: the Winlator runtime
+(Play is disabled), the touch overlay, the mod manager and the emulator boxes. Nothing here has run on a phone or an emulator;
+the sign-in and downloads have not been tried against a real account.
 
 ## The boxes
 
@@ -30,6 +32,16 @@ Code: `backend/src/main/kotlin/com/logie/persona/backend/steam` (JavaSteam 1.8.0
 
 ## Next
 
-1. Copy Blizzard's app shell (launcher, shelf, Winlator patches) and wire `:app` to `:backend`.
+1. Bring in the Winlator runtime through `patches/winlator` (Blizzard's way) and make Play start the game.
 2. Run Persona 4 Golden on the desktop Wine rig, then a phone: copy protection of each title is untested.
 3. Gamepad overlay per game; mod manager (GameBanana source, merge step); emulator boxes for 1 and 2.
+
+## Building
+
+`./gradlew :backend:test :app:testDebugUnitTest :app:assembleDebug` (JDK 17, Android SDK 35; `local.properties` needs `sdk.dir`).
+CI (`.github/workflows/build.yml`) does the same and keeps the debug APK as an artifact.
+
+## App layout
+
+`app/.../ui` (Launcher, SignInDialog), `app/.../install` (InstallCenter state, InstallService, KeystoreLoginStore,
+Wording: the only text about installs, tested to never name the store).
