@@ -1,5 +1,6 @@
 pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
 rootProject.name = 'Persona Launcher'
-// :backend is plain Kotlin/JVM (the catalog and the headless installer); :app is the Android launcher.
-include ':backend', ':app'
+// :backend is plain Kotlin/JVM (the catalog, the headless installer, the PSP disc reader, mods and touch gestures); :ppsspp is the PSP emulator built
+// from its own sources; :app is the Android launcher.
+include ':backend', ':ppsspp', ':app'

@@ -8,6 +8,9 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
+      # The PSP emulator (PPSSPP) is built from its own source, patched by patches/ppsspp. Its NDK and CMake come from the runner's SDK.
+      - run: sh scripts/prepare-ppsspp.sh
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;29.0.14206865" "cmake;3.22.1" > /dev/null
       # Release build, signed with the app's own key so each release installs over the last.
       - run: ./gradlew :backend:test :app:testDebugUnitTest :app:assembleRelease -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
       - run: cp app/build/outputs/apk/release/app-release.apk Persona.apk

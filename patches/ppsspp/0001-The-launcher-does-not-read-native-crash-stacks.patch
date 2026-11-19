@@ -1,0 +1,64 @@
+diff --git a/android/src/org/ppsspp/ppsspp/PpssppActivity.java b/android/src/org/ppsspp/ppsspp/PpssppActivity.java
+index 62caaa4..fc06628 100644
+--- a/android/src/org/ppsspp/ppsspp/PpssppActivity.java
++++ b/android/src/org/ppsspp/ppsspp/PpssppActivity.java
+@@ -3,7 +3,6 @@
+ import androidx.activity.OnBackPressedCallback;
+ import androidx.annotation.Keep;
+ 
+-import org.ppsspp.proto.TombstoneProtos;
+ import android.Manifest;
+ import android.annotation.SuppressLint;
+ import android.app.Activity;
+@@ -1996,49 +1995,8 @@ public ArrayList<String> getNativeCrashHistory(int max) {
+ 		ArrayList<String> tombstones = new ArrayList<>();
+ 		for (ApplicationExitInfo aei : exitReasons) {
+ 			if (aei.getReason() == ApplicationExitInfo.REASON_CRASH_NATIVE) {
+-				try {
+-					// Get the tombstone input stream
+-					InputStream trace = aei.getTraceInputStream();
+-					if (trace != null) {
+-						try {
+-							// Tombstone is a protobuf-generated class
+-							TombstoneProtos.Tombstone tombstone = TombstoneProtos.Tombstone.parseFrom(trace);
+-
+-							Log.i(TAG, "Adding tombstone.");
+-							StringBuilder desc = new StringBuilder(exitReasonToString(aei.getReason()) + "\n\n");
+-							Date exitDate = new Date(aei.getTimestamp());
+-							desc.append(timestampFormatter.format(exitDate)).append("\n");
+-							if (!tombstone.getAbortMessage().isEmpty()) {
+-								desc.append(tombstone.getAbortMessage()).append("\n");
+-							} else {
+-								for (TombstoneProtos.Cause x : tombstone.getCausesList()) {
+-									desc.append(x.getHumanReadable()).append("\n");
+-								}
+-							}
+-							int crashingTid = tombstone.getTid();
+-							TombstoneProtos.Thread thread = tombstone.getThreadsMap().get(crashingTid);
+-							if (thread != null) {
+-								desc.append("Stack trace of crashing thread:\n");
+-								for (int i = 0; i < thread.getCurrentBacktraceCount(); i++) {
+-									TombstoneProtos.BacktraceFrame frame = thread.getCurrentBacktrace(i);
+-									String functionName = frame.getFunctionName();
+-									if (functionName != null && !functionName.isEmpty()) {
+-										desc.append(String.format("%08x: %s : %s + %x\n", frame.getRelPc(), getFilenameFromPath(frame.getFileName()), functionName, frame.getFunctionOffset()));
+-									}
+-								}
+-							}
+-							// Format the tombstone to be displayable.
+-							tombstones.add(desc.toString());
+-							// use tombstone...
+-						} catch (Exception e) {
+-							Log.e(TAG, e.toString());
+-						}
+-					} else {
+-						Log.e(TAG, "Trace input stream was null, ignoring. Reason: " + exitReasonToString(aei.getReason()));
+-					}
+-				} catch (Exception e) {
+-					Log.e(TAG, e.toString());
+-				}
++				// The native crash report's stack is not read here (it needs a protobuf parser the launcher does not carry): the reason and the time are.
++				tombstones.add(exitReasonToString(aei.getReason()) + "\n\n" + timestampFormatter.format(new Date(aei.getTimestamp())) + "\n");
+ 			} else {
+ 				String desc = exitReasonToString(aei.getReason()) + "\n\n";
+ 				// desc += aei.toString(); no interesting data

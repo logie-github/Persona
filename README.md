@@ -6,7 +6,7 @@ Made for the Galaxy Z Fold.
 
 **Status: launcher shell and installer.** The Android app builds (debug APK, `com.logie.persona`): a shelf of five boxes with
 version chooser, a one-time sign-in, and background installs through a foreground service. Not built yet: the Winlator runtime
-(Play is disabled), the touch overlay, the mod manager and the emulator boxes. Nothing here has run on a phone or an emulator;
+(Play is disabled) and the app side of the PSP box (the backend and the emulator module are in; see "Persona 1 on the PSP emulator"). Nothing here has run on a phone or an emulator;
 the sign-in and downloads have not been tried against a real account.
 
 ## The boxes
@@ -38,8 +38,10 @@ Code: `backend/src/main/kotlin/com/logie/persona/backend/steam` (JavaSteam 1.8.0
 
 ## Building
 
-`./gradlew :backend:test :app:testDebugUnitTest :app:assembleDebug` (JDK 17, Android SDK 35; `local.properties` needs `sdk.dir`).
-CI (`.github/workflows/build.yml`) does the same and keeps the debug APK as an artifact.
+`sh scripts/prepare-ppsspp.sh` once (it clones the PSP emulator's source at the tag in `ppsspp-version.env` into `build/ppsspp-src` and applies
+`patches/ppsspp`), then `./gradlew :backend:test :app:testDebugUnitTest :app:assembleDebug` (JDK 17, Android SDK 35, NDK 29.0.14206865 and CMake 3.22.1
+for the emulator's native code; `local.properties` needs `sdk.dir`). `-PpspNative=false` leaves the emulator's native code out for quick checks.
+CI (`.github/workflows/build.yml`) does the same and keeps the APK as an artifact.
 
 ## App layout
 
@@ -59,7 +61,8 @@ Android asks to allow installing from this app, and each update needs its one ta
 The dialog now says why. The whole story (the library's own log lines and the error's stack) is in the app's private `files/signin.log`.
 The first sign-in in build 3 and earlier could not start at all: the library that encrypts the password finds its crypto provider
 by class name, and none was bundled (SpongyCastle is now, `app/build.gradle`). A Guard code is typed in the dialog; approving
-in the phone's app instead is not offered. Connections use the WebSocket route on port 443 only, with up to three tries.
+in the phone's app instead is not offered. Connections try the direct route (TCP) and then the WebSocket route on port 443, four tries each, with a short timeout; when both fail the
+dialog lists each route's own reason (`Connection`, `openConnection`).
 
 ## Persona 1's screen (in progress; not wired into the app yet)
 
@@ -83,3 +86,30 @@ After the reference picture of the girl with the moon. All of it is in `skins/vi
 
 Run the page with any static server and `index.html?mock=1&set=p3&sel=1` (`set=p1` for Persona 1, `t=` to freeze the time). The page talks to
 the app through `window.Skin.setState` and the `Android.select` / `Android.activate` bridge. Other games get their own skins the same way.
+
+## Persona 1 on the PSP emulator
+
+The box plays the PSP game (*Shin Megami Tensei: Persona*, ULUS10432) from the person's own disc image (ISO or CSO) through PPSSPP, built from its own
+source as the `:ppsspp` module (its Android activity, Java classes, assets and native code; `patches/ppsspp/0001` removes the crash-report
+dependency). None of PPSSPP's own screens are shown; its settings are the launcher's OPTIONS.
+
+- **Import** (`backend/.../psp`): `Disc` reads ISO and CSO images, `ParamSfo` reads the game's id and title, `PspDiscs.identify` accepts only Persona 1
+  (the other PSP Persona games are refused).
+- **Options** (`PspOptions`, `PspSettingsFiles`): sharpness (internal resolution), smoothing, slanted textures, edge smoothing, texture upscaling,
+  frame rate, frame skip, Vulkan, mods, sound, touch controls and their opacity, vibration. They are written as PPSSPP's own ini keys (global and
+  per game) before each start.
+- **Mods** (`backend/.../mods`, like Blizzard's addon importer): `GameBanana` lists, searches and reads the PSP game's mods (game 12961); `ModArchive`
+  opens zip and 7z; `ModPlanner` sorts what an archive holds (texture packs, with the variants a `textures.ini` offers; cheats; disc files; EBOOT
+  patches in xdelta form, applied by `Vcdiff`); `PspMods` installs, switches and removes them under the game's memory stick
+  (`PSP/TEXTURES/<id>/m<modId>/` with a merged `textures.ini`, `PSP/Cheats/<id>.ini`, `mods/m<id>/`) and rebuilds a patched copy of the game from
+  the untouched image when a mod changes disc files, so removing a mod restores the original.
+- **Touch** (`backend/.../touch/Gestures`, a pure state machine with explicit time): a held swipe anywhere is the d-pad or left stick; one swipe left or
+  right is L1 or R1; a held tap is Circle (it combines with a held swipe to run); one tap is Cross; a double tap is Triangle; a swipe in from the right
+  edge is Start; a tap followed by a held tap is one press of Square. PPSSPP's own on-screen buttons are turned off.
+- Nothing of this has run on a phone. The PPSSPP native library builds for arm64 here (about 220 MB unstripped); the gestures, disc reading,
+  options and mod planning are unit-tested; the app screens (import, MODS, OPTIONS, the activity that hosts the emulator) are not written yet.
+
+## The app's icon
+
+`branding/igor.jpg` with a white blocky P in the lower right, as an adaptive icon (`app/src/main/res/drawable-nodpi/ic_launcher_*.png`,
+`mipmap-anydpi-v26`) and legacy PNGs. The P stays inside the middle 66% so round masks keep it whole.

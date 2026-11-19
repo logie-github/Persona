@@ -17,8 +17,17 @@ import kotlinx.coroutines.withTimeout
 import java.io.Closeable
 
 /** A connected [SteamClient] with its callback pump running; [close] stops it. */
-internal class Connection : Closeable {
-    val client = SteamClient(SteamConfiguration.create { it.withProtocolTypes(ProtocolTypes.WEB_SOCKET) })
+internal class Connection(val protocol: ProtocolTypes = ProtocolTypes.TCP) : Closeable {
+    /** The library's own complaints while this connection was being made: what the screen shows when it can't be (no logs are needed from the phone). */
+    val problems = java.util.concurrent.ConcurrentLinkedDeque<String>()
+    private val listener = object : `in`.dragonbra.javasteam.util.log.LogListener {
+        override fun onLog(clazz: Class<*>, message: String?, throwable: Throwable?) {
+            if (message != null && Regex("(?i)exception|timed out|failed|refused|unreachable|handshake|certificate|ssl|tls").containsMatchIn(message)) note("${clazz.simpleName}: $message")
+        }
+        override fun onError(clazz: Class<*>, message: String?, throwable: Throwable?) { note("${clazz.simpleName}: $message ${throwable?.javaClass?.simpleName.orEmpty()} ${throwable?.message.orEmpty()}".trim()) }
+        private fun note(t: String) { problems.addLast(t.take(160)); while (problems.size > 4) problems.pollFirst() }
+    }.also { `in`.dragonbra.javasteam.util.log.LogManager.addListener(it) }
+    val client = SteamClient(SteamConfiguration.create { it.withProtocolTypes(protocol) })
     val callbacks = CallbackManager(client)
     val user: SteamUser = requireNotNull(client.getHandler<SteamUser>())
 
@@ -36,7 +45,10 @@ internal class Connection : Closeable {
         pump.start()
     }
 
-    /** Connects, trying again with another server when one is down (a failed server is marked bad by the library). */
+    /**
+     * Connects, trying again with another server when one is down (a failed server is marked bad by the library). One try per call to this: [open] goes
+     * through the routes in turn.
+     */
     suspend fun connect(timeoutMs: Long = 20_000, tries: Int = 3) {
         var last: Throwable? = null
         repeat(tries) { attempt ->
@@ -71,9 +83,27 @@ internal class Connection : Closeable {
     }
 
     override fun close() {
+        runCatching { `in`.dragonbra.javasteam.util.log.LogManager.removeListener(listener) }
         running = false
         runCatching { if (client.isConnected) user.logOff() }
         runCatching { client.disconnect() }
         subscriptions.forEach { runCatching { it.close() } }
     }
+}
+
+private val ROUTES = listOf(ProtocolTypes.TCP to "direct", ProtocolTypes.WEB_SOCKET to "web")
+
+/**
+ * A connection to the service, made over whichever route gets through: the direct one first (as most networks allow it), then the web one
+ * (port 443). When none does, the message says how each failed and what the library complained of.
+ */
+internal suspend fun openConnection(timeoutMs: Long = 7_000): Connection {
+    val failures = ArrayList<String>()
+    for ((protocol, label) in ROUTES) {
+        val c = Connection(protocol)
+        try { c.connect(timeoutMs, tries = 4); return c }
+        catch (e: kotlinx.coroutines.CancellationException) { c.close(); throw e }
+        catch (e: Exception) { failures += "$label: ${e.message ?: e.javaClass.simpleName}" + c.problems.lastOrNull()?.let { " ($it)" }.orEmpty(); c.close() }
+    }
+    throw java.io.IOException("Could not reach the service. " + failures.joinToString("; "))
 }

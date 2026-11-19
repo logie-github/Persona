@@ -33,8 +33,7 @@ class Installer(private val store: LoginStore) {
         val login = store.load() ?: throw SignInRequired("Not signed in.")
         dir.mkdirs()
         onProgress(InstallProgress(InstallProgress.Step.CONNECTING, 0f))
-        Connection().use { conn ->
-            conn.connect()
+        openConnection().use { conn ->
             val licences = conn.logOn(login)
             onProgress(InstallProgress(InstallProgress.Step.CHECKING, 0f))
             val done = CompletableDeferred<Throwable?>()

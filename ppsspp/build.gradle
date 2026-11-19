@@ -1,0 +1,50 @@
+plugins { id 'com.android.library' }
+
+// The PSP emulator, built from its own sources (scripts/prepare-ppsspp.sh puts them in build/ppsspp-src): its Android activity and Java classes, its
+// assets, and its native code (CMake, as the emulator's own Android project builds it). -PpspNative=false leaves the native code out, for
+// quick builds that only check the Kotlin and Java (nothing can play a game without it).
+def src = rootProject.file('build/ppsspp-src')
+if (!new File(src, 'android/src').isDirectory()) {
+	throw new GradleException("The PSP emulator isn't in build/ppsspp-src: run scripts/prepare-ppsspp.sh")
+}
+def withNative = (project.findProperty('pspNative') ?: 'true') != 'false'
+
+android {
+	namespace = 'org.ppsspp.ppsspp'
+	compileSdk = 36
+	ndkVersion = '29.0.14206865'
+
+	defaultConfig {
+		minSdk = 26
+		ndk { abiFilters 'arm64-v8a' }
+		if (withNative) {
+			externalNativeBuild {
+				cmake {
+					arguments '-DANDROID=true', '-DANDROID_PLATFORM=android-21', '-DANDROID_TOOLCHAIN=clang', '-DANDROID_CPP_FEATURES=', '-DANDROID_STL=c++_shared'
+					targets 'ppsspp_jni'
+				}
+			}
+		}
+	}
+	if (withNative) {
+		externalNativeBuild { cmake { path = new File(src, 'CMakeLists.txt') } }
+	}
+
+	compileOptions { sourceCompatibility JavaVersion.VERSION_11; targetCompatibility JavaVersion.VERSION_11 }
+
+	sourceSets {
+		main {
+			manifest.srcFile 'src/main/AndroidManifest.xml'
+			java.srcDirs = [new File(src, 'android/src')]
+			res.srcDirs = [new File(src, 'android/res'), new File(src, 'android/normal/res')]
+			assets.srcDirs = [new File(src, 'assets')]
+		}
+	}
+	packaging { jniLibs { useLegacyPackaging = true } }
+	lint { abortOnError = false }
+}
+
+dependencies {
+	implementation 'androidx.appcompat:appcompat:1.7.1'
+	implementation 'androidx.documentfile:documentfile:1.1.0'
+}

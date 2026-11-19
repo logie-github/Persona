@@ -19,8 +19,7 @@ class SignIn(private val store: LoginStore) {
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun signIn(username: String, password: CharArray, prompt: GuardPrompt) {
         require(username.isNotBlank() && password.isNotEmpty()) { "A name and a password are needed." }
-        Connection().use { conn ->
-            conn.connect()
+        openConnection().use { conn ->
             val details = AuthSessionDetails().apply {
                 this.username = username.trim()
                 this.password = String(password)

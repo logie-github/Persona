@@ -8,13 +8,13 @@ data class MenuOption(val id: OptionId, val label: String, val enabled: Boolean)
 object MenuSpec {
     /**
      * PLAY (launch the game), INSTALL (UNINSTALL once it is installed), VERSION (only where there is more than one),
-     * MODS (PC versions only) and OPTIONS (the emulator's, or the game's own). The same five on every game.
+     * MODS (PC versions, and the PSP game's GameBanana mods) and OPTIONS (the emulator's, or the game's own). The same five on every game.
      */
     fun optionsFor(game: Game, version: Version, installed: Boolean, busy: Boolean = false): List<MenuOption> = buildList {
         add(MenuOption(OptionId.PLAY, "PLAY", installed && !busy))
         add(if (installed) MenuOption(OptionId.UNINSTALL, "UNINSTALL", !busy) else MenuOption(OptionId.INSTALL, "INSTALL", !busy))
         if (game.versions.size > 1) add(MenuOption(OptionId.VERSION, "VERSION", !busy))
-        if (version.runtime == Runtime.WINLATOR) add(MenuOption(OptionId.MODS, "MODS", installed && !busy))
+        if (version.runtime == Runtime.WINLATOR || version.runtime == Runtime.PSP_EMULATOR) add(MenuOption(OptionId.MODS, "MODS", installed && !busy))
         add(MenuOption(OptionId.OPTIONS, "OPTIONS", !busy))
     }
 }
