@@ -46,6 +46,13 @@ object WindowsRuntime {
     /** Winlator's built-in "Virtual Gamepad" controls profile (assets/inputcontrols/profiles/controls-3.icp). */
     const val GAMEPAD_PROFILE = 3
 
+    /** Winlator's default for a new container (Vortek and Gladio) and, on an Adreno GPU (Snapdragon: the Fold's), Turnip, as the Blizzard launcher chooses. */
+    private const val DEFAULT_DRIVER = "vortek,gladio"
+    private const val TURNIP_DRIVER = "turnip,gladio"
+    private const val DEFAULT_D3D = "dxvk"
+    /** On an Adreno GPU DXVK names a desktop card the games know, the same at every start (the Blizzard launcher's choice). */
+    private const val DESKTOP_CARD = "73bf:1002:AMD Radeon RX 6800 XT"
+
     /** When the last game was started (SHARE LOG says so). */
     @Volatile var lastStart: Long? = null
         private set
@@ -102,9 +109,10 @@ object WindowsRuntime {
         }
 
         _state.value = State.Preparing(version.id, Step.STARTING)
-        // What Wine reports (errors, faults and their handlers, the libraries it loads) and Box64's basic log, into the session's log (patch 0007).
+        // What Wine reports (errors, faults and their handlers, the libraries it loads) into the session's log (patches 0007, 0008).
         android.preference.PreferenceManager.getDefaultSharedPreferences(context).edit()
-            .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 1).apply()
+            // Box64's own log off, as the Blizzard launcher has it: it repeats its settings for every program Wine starts and slows a start.
+            .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 0).apply()
         val sessionLog = withContext(Dispatchers.IO) { WindowsLogs.newSession(context) }
         lastStart = System.currentTimeMillis()
         log(context, "${version.id}: starting ${exe.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()})")
@@ -140,9 +148,19 @@ object WindowsRuntime {
     private suspend fun container(context: Context, screen: String): Container {
         val manager = withContext(Dispatchers.IO) { ContainerManager(context) }
         val drives = "D:" + gamesDir(context).path
+        val adreno = runCatching { com.winlator.core.GPUHelper.getAdrenoModelId(context) > 0 }.getOrDefault(false)
+        val driver = if (adreno) TURNIP_DRIVER else DEFAULT_DRIVER
+        val d3dConfig = if (adreno) "customDevice=$DESKTOP_CARD" else ""
         manager.containers.firstOrNull { it.name == CONTAINER_NAME }?.let { existing ->
             existing.setDrives(drives)
             existing.setScreenSize(screen)
+            // Every start: the driver and Direct3D settings this app chooses (Winlator extracts a changed driver or DXVK by itself).
+            if (existing.getGraphicsDriver() != driver || existing.getDXWrapper() != DEFAULT_D3D || existing.getDXWrapperConfig() != d3dConfig) {
+                existing.setGraphicsDriver(driver)
+                existing.setDXWrapper(DEFAULT_D3D)
+                existing.setDXWrapperConfig(d3dConfig)
+                existing.putExtra("dxwrapper", null)
+            }
             withContext(Dispatchers.IO) { existing.saveData() }
             return existing
         }
@@ -151,9 +169,9 @@ object WindowsRuntime {
             .put("name", CONTAINER_NAME)
             .put("screenSize", screen)
             .put("envVars", defaults.getEnvVars())
-            .put("graphicsDriver", defaults.getGraphicsDriver())
-            .put("dxwrapper", defaults.getDXWrapper())
-            .put("dxwrapperConfig", defaults.getDXWrapperConfig())
+            .put("graphicsDriver", driver)
+            .put("dxwrapper", DEFAULT_D3D)
+            .put("dxwrapperConfig", d3dConfig)
             .put("audioDriver", defaults.getAudioDriver())
             .put("wincomponents", defaults.getWinComponents())
             .put("drives", drives)

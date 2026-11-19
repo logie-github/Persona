@@ -1,0 +1,64 @@
+From ad2ad56d0aa775906469dc69efac83b9dfa23198 Mon Sep 17 00:00:00 2001
+From: persona <persona@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 19:51:22 +0000
+Subject: [PATCH] The session's start, its program's end and its exit noted in
+ the session's log
+
+---
+ .../com/winlator/XServerDisplayActivity.java   | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/app/src/main/java/com/winlator/XServerDisplayActivity.java b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+index 13b3979..cc1d8bf 100644
+--- a/app/src/main/java/com/winlator/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+@@ -163,6 +163,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         String sessionLog = getIntent().getStringExtra("session_log");
+         if (sessionLog != null && !sessionLog.isEmpty()) {
+             final java.io.File logFile = new java.io.File(sessionLog);
++            personaLog = logFile;
+             final long[] written = {0};
+             ProcessHelper.addDebugCallback((line) -> {
+                 synchronized (written) {
+@@ -425,7 +426,18 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         return preferences;
+     }
+ 
++    /** Persona app: the session's log (extra "session_log"), where the session's own events are noted beside its programs' output. */
++    private static java.io.File personaLog;
++
++    static void personaNote(String text) {
++        java.io.File f = personaLog;
++        if (f == null) return;
++        try (java.io.FileWriter w = new java.io.FileWriter(f, true)) { w.write("[persona] " + new java.util.Date() + " " + text + "\n"); }
++        catch (java.io.IOException e) {}
++    }
++
+     private void exit() {
++        personaNote("the game screen closes");
+         winHandler.stop();
+         if (environment != null) environment.stopEnvironmentComponents();
+ 
+@@ -505,6 +517,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+             String desktopName = shortcut != null || getIntent().hasExtra("exec_path") ? "nogui" : "shell";
+             String guestExecutable = "wine explorer /desktop="+desktopName+","+xServer.screenInfo+" "+getWineStartCommand();
+             guestProgramLauncherComponent.setGuestExecutable(guestExecutable);
++            personaNote("starting: " + guestExecutable + " (graphics " + graphicsDriver[0] + "," + graphicsDriver[1] + ", " + container.getDXWrapper() + " " + container.getDXWrapperConfig() + ", Box64 " + container.getBox64Preset() + ")");
+ 
+             envVars.putAll(container.getEnvVars());
+             if (shortcut != null) envVars.putAll(shortcut.getExtra("envVars"));
+@@ -548,7 +561,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         }
+ 
+         guestProgramLauncherComponent.setEnvVars(envVars);
+-        guestProgramLauncherComponent.setTerminationCallback((status) -> exit());
++        guestProgramLauncherComponent.setTerminationCallback((status) -> {
++            personaNote("the session's program ended with status " + status);
++            exit();
++        });
+         environment.addComponent(guestProgramLauncherComponent);
+ 
+         if (isGenerateWineprefix()) {
+-- 
+2.43.0
+

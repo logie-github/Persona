@@ -191,7 +191,9 @@ warnings again: `cFlags` in `app/build.gradle`); its prebuilt C++ runtime is mad
 Patches (`patches/winlator`): 0001 the runtime in the app's data folder and leaving the game returns to the launcher; 0002 resource ids as variables (the
 app's R isn't final); 0003 the runtime installed without Winlator's screens; 0004 the program's arguments apart from its path; 0005 no window picture without
 a GL context (a crash fix); 0006 a game started with on-screen controls (`controls_profile`) and full-screen windows (`force_fullscreen`); 0007 the session's programs' output (Wine, Box64, the game)
-written to the file named by the `session_log` extra. 0001 to 0005 are the Blizzard launcher's.
+written to the file named by the `session_log` extra; 0008 the session's own events in that log (`[persona]` lines: the command started with
+its graphics driver, Direct3D layer and Box64 preset, the status its program ended with, the game screen closing). 0001 to 0005 are the Blizzard
+launcher's.
 
 PLAY (`windows/WindowsRuntime`): installs the runtime the first time (a gauge on the game's screen), makes the games' Windows once (one container,
 "Persona", the games' folder as drive D:), finds the game's program (`GameExe`: P4G.exe, P3P.exe, P3R.exe, P5R.exe... else the largest program that isn't an
@@ -206,10 +208,16 @@ PLAY signs in with the saved sign-in (`steam/GameTickets`), asks for the game's 
 (`disable_lan_only=1`). The ticket is fetched at every start (it is short-lived), so PLAY needs the network; without it the game starts with no ticket,
 which a Denuvo game refuses. The result (not the ticket) is noted in `files/windows.log`.
 
-**Logs.** Each start writes `files/windows-session.log` (the one before kept as `.1`): Wine's `err,seh,loaddll` channels and Box64's basic log (patch
-0007), beside the app's notes (`files/windows.log`) and any crash of the app (`files/crash.log`, `PersonaApp`). When there are logs, the game's screen
-shows **SHARE LOG**, which sends all three as text through Android's share sheet.
+**Graphics.** The games' Windows is set at every start: on an Adreno GPU (Snapdragon: the Fold's) the Turnip driver with Gladio, and DXVK naming a
+desktop card (an AMD Radeon RX 6800 XT, the same at every start), as the Blizzard launcher does; elsewhere Winlator's default, Vortek. Winlator extracts
+a changed driver or DXVK by itself.
 
-Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`). The
+**Logs.** Each start writes `files/windows-session.log` (the one before kept as `.1`): Wine's `err,seh,loaddll` channels (patch 0007) and the session's
+own events (patch 0008), beside the app's notes (`files/windows.log`) and any crash of the app (`files/crash.log`, `PersonaApp`). Box64's own log is
+off (it repeats its settings for every program). When there are logs, the game's screen shows **SHARE LOG**: a short digest as text that pastes whole
+(`LogDigest`: Box64's settings and Windows' own libraries left out, repeats counted, the end kept), how Android says the app's last runs ended
+(ApplicationExitInfo: a native crash with its tombstone's readable words, the system ending it, memory), and the full logs as a file beside it.
+
+Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`), the log digest (`LogDigestTest`). The
 ticket request has not been run against the service (it needs a signed-in account that owns the game). Not run on a phone:
 whether Persona 4 Golden starts and plays under Winlator on the Fold has not been seen.

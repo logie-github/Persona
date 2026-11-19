@@ -1,0 +1,1 @@
+Windows games use the phone's Adreno graphics driver, and SHARE LOG sends a short log that pastes whole plus the full log as a file.
