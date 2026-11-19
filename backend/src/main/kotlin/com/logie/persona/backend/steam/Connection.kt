@@ -9,6 +9,7 @@ import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOnCallba
 import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
 import `in`.dragonbra.javasteam.steam.steamclient.configuration.SteamConfiguration
 import `in`.dragonbra.javasteam.networking.steam3.ProtocolTypes
+import `in`.dragonbra.javasteam.steam.discovery.ServerRecord
 import `in`.dragonbra.javasteam.steam.steamclient.callbackmgr.CallbackManager
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.ConnectedCallback
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.DisconnectedCallback
@@ -45,24 +46,16 @@ internal class Connection(val protocol: ProtocolTypes = ProtocolTypes.TCP) : Clo
         pump.start()
     }
 
-    /**
-     * Connects, trying again with another server when one is down (a failed server is marked bad by the library). One try per call to this: [open] goes
-     * through the routes in turn.
-     */
-    suspend fun connect(timeoutMs: Long = 20_000, tries: Int = 3) {
-        var last: Throwable? = null
-        repeat(tries) { attempt ->
-            try {
-                val gone = CompletableDeferred<Boolean>()
-                val sub = callbacks.subscribe<DisconnectedCallback> { gone.complete(it.isUserInitiated) }
-                try {
-                    client.connect()
-                    withTimeout(timeoutMs) { kotlinx.coroutines.selects.select<Unit> { connected.onAwait { }; gone.onAwait { throw java.io.IOException("Could not reach the service (attempt ${attempt + 1})") } } }
-                    return
-                } finally { runCatching { sub.close() } }
-            } catch (e: Exception) { last = e; runCatching { client.disconnect() } }
-        }
-        throw java.io.IOException("Could not connect after $tries tries: ${last?.message}", last)
+    /** One try at [server] (or the library's own pick when null); throws [java.io.IOException] saying how it failed. */
+    suspend fun connect(server: ServerRecord?, timeoutMs: Long) {
+        val gone = CompletableDeferred<Boolean>()
+        val sub = callbacks.subscribe<DisconnectedCallback> { gone.complete(it.isUserInitiated) }
+        try {
+            client.connect(server)
+            withTimeout(timeoutMs) { kotlinx.coroutines.selects.select<Unit> { connected.onAwait { }; gone.onAwait { throw java.io.IOException("refused") } } }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            runCatching { client.disconnect() }; throw java.io.IOException("no answer in ${timeoutMs / 1000}s")
+        } finally { runCatching { sub.close() } }
     }
 
     /** Logs on with a saved refresh token; returns the licences the account holds. */
@@ -71,7 +64,8 @@ internal class Connection(val protocol: ProtocolTypes = ProtocolTypes.TCP) : Clo
         val licences = CompletableDeferred<List<License>>()
         subscriptions += callbacks.subscribe<LoggedOnCallback> { loggedOn.complete(it) }
         subscriptions += callbacks.subscribe<LicenseListCallback> { licences.complete(it.licenseList) }
-        user.logOn(LogOnDetails(username = login.username, accessToken = login.refreshToken, shouldRememberPassword = true))
+        // A login id of this app's own (stable per account), so another Steam client signed in to the same account on this phone or another does not push this one off.
+        user.logOn(LogOnDetails(username = login.username, accessToken = login.refreshToken, shouldRememberPassword = true, loginID = ("persona:" + login.username.lowercase()).hashCode(), machineName = "Persona"))
         val result = withTimeout(timeoutMs) { loggedOn.await() }
         when (result.result) {
             EResult.OK -> Unit
@@ -91,19 +85,20 @@ internal class Connection(val protocol: ProtocolTypes = ProtocolTypes.TCP) : Clo
     }
 }
 
-private val ROUTES = listOf(ProtocolTypes.TCP to "direct", ProtocolTypes.WEB_SOCKET to "web")
-
 /**
- * A connection to the service, made over whichever route gets through: the direct one first (as most networks allow it), then the web one
- * (port 443). When none does, the message says how each failed and what the library complained of.
+ * A connection to the service. The web servers on port 443 come first, from the service's own list ([CmDirectory]): 443 is the one port that mobile and public
+ * networks nearly always let through, and the library's own pick often lands on a port they block (27017 to 27019). Then the direct route as the library chooses.
+ * When none gets through, the message says how each failed.
  */
-internal suspend fun openConnection(timeoutMs: Long = 7_000): Connection {
-    val failures = ArrayList<String>()
-    for ((protocol, label) in ROUTES) {
+internal suspend fun openConnection(perServerMs: Long = 6_000, webServers: Int = 6, directTries: Int = 2): Connection {
+    val failures = LinkedHashSet<String>()
+    suspend fun attempt(protocol: ProtocolTypes, server: ServerRecord?, label: String): Connection? {
         val c = Connection(protocol)
-        try { c.connect(timeoutMs, tries = 4); return c }
+        try { c.connect(server, perServerMs); return c }
         catch (e: kotlinx.coroutines.CancellationException) { c.close(); throw e }
-        catch (e: Exception) { failures += "$label: ${e.message ?: e.javaClass.simpleName}" + c.problems.lastOrNull()?.let { " ($it)" }.orEmpty(); c.close() }
+        catch (e: Exception) { failures += "$label: ${e.message ?: e.javaClass.simpleName}" + c.problems.lastOrNull()?.let { " ($it)" }.orEmpty(); c.close(); return null }
     }
-    throw java.io.IOException("Could not reach the service. " + failures.joinToString("; "))
+    for (server in CmDirectory.webServers().take(webServers)) attempt(ProtocolTypes.WEB_SOCKET, server, "web ${server.endpoint.hostString}")?.let { return it }
+    repeat(directTries) { attempt(ProtocolTypes.TCP, null, "direct")?.let { return it } }
+    throw java.io.IOException("Could not reach the service. " + failures.take(4).joinToString("; "))
 }

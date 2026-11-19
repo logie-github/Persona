@@ -27,19 +27,34 @@ data class PspOptions(
     val modTextures: Boolean = true,
     val modCheats: Boolean = true,
     val sound: Boolean = true,
+    /** The swipe-and-tap touch controls ([com.logie.persona.backend.touch.Gestures]); off when a game pad is used. The emulator's own on-screen buttons are never shown. */
     val touchControls: Boolean = true,
-    /** How see-through the touch buttons are, in percent (5..100). */
-    val touchOpacity: Int = 65,
-    /** 0 = the default look, 1 = classic, 2.. = the emulator's other styles. */
-    val touchStyle: Int = 1,
     val vibration: Boolean = false,
 ) {
     init {
         require(sharpness in 0..10 && smoothing in 0..3 && slantedTextures in 0..4 && edgeSmoothing in 0..3 && textureUpscale in 1..5 && upscaleKind in 0..3)
-        require(frameRate in setOf(0, 30, 60, 120) && frameSkip in 0..9 && touchOpacity in 5..100)
+        require(frameRate in setOf(0, 30, 60, 120) && frameSkip in 0..9)
     }
 
+    /** Saved as a small JSON file the launcher and the game's own process both read. */
+    fun toJson(): String = org.json.JSONObject().put("sharpness", sharpness).put("smoothing", smoothing).put("slantedTextures", slantedTextures)
+        .put("edgeSmoothing", edgeSmoothing).put("textureUpscale", textureUpscale).put("upscaleKind", upscaleKind).put("frameRate", frameRate)
+        .put("frameSkip", frameSkip).put("autoFrameSkip", autoFrameSkip).put("vulkan", vulkan).put("modTextures", modTextures).put("modCheats", modCheats)
+        .put("sound", sound).put("touchControls", touchControls).put("vibration", vibration).toString()
+
     companion object {
+        /** Reads what [toJson] wrote; anything missing or not allowed is the default (a damaged file must not stop the game from starting). */
+        fun fromJson(text: String?): PspOptions {
+            val d = PspOptions()
+            val j = try { org.json.JSONObject(text ?: return d) } catch (e: Exception) { return d }
+            return try {
+                PspOptions(j.optInt("sharpness", d.sharpness), j.optInt("smoothing", d.smoothing), j.optInt("slantedTextures", d.slantedTextures), j.optInt("edgeSmoothing", d.edgeSmoothing),
+                    j.optInt("textureUpscale", d.textureUpscale), j.optInt("upscaleKind", d.upscaleKind), j.optInt("frameRate", d.frameRate), j.optInt("frameSkip", d.frameSkip),
+                    j.optBoolean("autoFrameSkip", d.autoFrameSkip), j.optBoolean("vulkan", d.vulkan), j.optBoolean("modTextures", d.modTextures), j.optBoolean("modCheats", d.modCheats),
+                    j.optBoolean("sound", d.sound), j.optBoolean("touchControls", d.touchControls), j.optBoolean("vibration", d.vibration))
+            } catch (e: IllegalArgumentException) { d }
+        }
+
         /** What each OPTIONS row offers, in order, as (label, value, how it's shown): the screen builds its rows from this, not from the fields. */
         val SHARPNESS = listOf(0 to "Fit to the screen", 1 to "1x", 2 to "2x", 3 to "3x", 4 to "4x", 5 to "5x", 6 to "6x", 8 to "8x", 10 to "10x")
         val FRAME_RATE = listOf(0 to "Standard", 30 to "30", 60 to "60", 120 to "120")
@@ -64,8 +79,11 @@ object PspSettingsFiles {
             "SaveNewTextures" to "False",
         ),
         "Sound" to listOf("Enable" to o.sound.toString().cap()),
-        "Control" to listOf("ShowTouchControls" to o.touchControls.toString().cap(), "TouchButtonOpacity" to o.touchOpacity.toString(), "TouchButtonStyle" to o.touchStyle.toString(), "HapticFeedback" to o.vibration.toString().cap()),
+        "Control" to listOf("ShowTouchControls" to "False", "HapticFeedback" to o.vibration.toString().cap()),     // the launcher's own gestures replace the on-screen buttons
     ).let { if (o.frameRate == 0) it else it.replace("[Graphics]\n", "[Graphics]\nFrameRate = ${o.frameRate}\n") }
+
+    /** `controls.ini`: every button the game uses is the key the gestures send (see [PspControls]); anything not listed here has no mapping. */
+    fun controls(): String = ini("ControlMapping" to PspControls.mapping.map { (name, code) -> name to "${PspControls.DEVICE}-$code" })
 
     /** The file that tells the emulator where its memory stick is (it reads this from its own data folder). */
     fun memstickPointer(dir: String): String = dir

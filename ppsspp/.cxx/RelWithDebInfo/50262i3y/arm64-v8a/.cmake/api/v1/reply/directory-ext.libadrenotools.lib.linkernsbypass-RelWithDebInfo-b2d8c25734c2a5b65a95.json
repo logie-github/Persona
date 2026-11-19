@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "ext/libadrenotools/lib/linkernsbypass",
+		"source" : "ext/libadrenotools/lib/linkernsbypass"
+	}
+}

@@ -11,7 +11,9 @@ def prop = { String name, String fallback ->
 
 android {
 	namespace = 'com.logie.persona'
-	compileSdk = 35
+	compileSdk = 36
+	// The emulator's native library is stripped of its debug symbols at packaging (it needs this NDK to find the tool): 209 MB becomes a fraction of that.
+	ndkVersion = '29.0.14206865'
 
 	buildFeatures { compose = true; buildConfig = true }
 
@@ -52,6 +54,7 @@ android {
 	}
 
 	packaging {
+		jniLibs { useLegacyPackaging = true }
 		resources { excludes += ['META-INF/{AL2.0,LGPL2.1}', 'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/*.kotlin_module'] }
 	}
 
@@ -68,6 +71,11 @@ android {
 
 dependencies {
 	implementation project(':backend')
+	// The PSP emulator (PPSSPP, built from its own source): its activity is what PspActivity builds on.
+	implementation project(':ppsspp')
+	implementation 'androidx.appcompat:appcompat:1.7.1'
+	// Draws the sign-in approval link as a QR code.
+	implementation 'com.google.zxing:core:3.5.3'
 	// Steam's sign-in encrypts the password with a provider JavaSteam looks up by name on Android: without these the sign-in cannot start.
 	implementation 'com.madgag.spongycastle:core:1.58.0.0'
 	implementation 'com.madgag.spongycastle:prov:1.58.0.0'

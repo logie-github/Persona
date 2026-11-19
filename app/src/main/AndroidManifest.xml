@@ -20,6 +20,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- The PSP game, in its own process; the launcher's PspActivity builds on the emulator's activity and shows none of its screens. -->
+        <activity android:name=".psp.PspActivity" android:exported="false" android:process=":psp"
+            android:theme="@style/ppsspp_style" android:screenOrientation="sensorLandscape" android:launchMode="singleTask"
+            android:configChanges="locale|keyboard|keyboardHidden|navigation|uiMode|orientation|screenSize|smallestScreenSize|screenLayout|density|fontScale" />
         <service android:name=".install.InstallService" android:exported="false"
             android:foregroundServiceType="dataSync" />
         <provider

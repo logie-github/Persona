@@ -52,10 +52,16 @@ object InstallCenter {
 
     fun set(id: String, ui: InstallUi) = _state.update { it + (id to ui) }
 
+    /** Removes a downloaded game's files. */
+    fun uninstall(context: Context, version: Version) {
+        dir(context, version).deleteRecursively()
+        _state.update { it - version.id }
+    }
+
     fun isRunning(id: String): Boolean = _state.value[id] is InstallUi.Running
 
-    /** Null when signed in; otherwise why not, in words (and the whole story is in files/signin.log). Errors included: a failing library must not hide. */
-    suspend fun signIn(context: Context, username: String, password: CharArray): String? {
+    /** Runs [block] with the library's own log lines going to files/signin.log (the whole story, for when a sign-in fails), and turns what it throws into words. Null when it worked. */
+    private suspend fun logged(context: Context, block: suspend () -> Unit): String? {
         val log = File(context.filesDir, "signin.log")
         fun note(text: String) = runCatching { log.appendText("${java.util.Date()} $text\n") }
         val listener = object : LogListener {
@@ -64,16 +70,7 @@ object InstallCenter {
         }
         LogManager.addListener(listener)
         return try {
-            SignIn(KeystoreLoginStore(context)).signIn(username, password, object : GuardPrompt {
-                override suspend fun code(kind: GuardKind, previousWasWrong: Boolean): String? {
-                    val request = CodeRequest(kind, previousWasWrong, CompletableDeferred())
-                    _code.value = request
-                    return request.reply.await().also { _code.value = null }
-                }
-                // A typed code is used when the account allows one; waiting for an approval in the phone's app is not offered here.
-                override suspend fun approvedOnPhone(): Boolean = false
-            })
-            null
+            block(); null
         } catch (e: kotlinx.coroutines.CancellationException) {
             _code.value = null; throw e
         } catch (t: Throwable) {
@@ -85,6 +82,29 @@ object InstallCenter {
         }
     }
 
+    private val _waitingForApproval = MutableStateFlow(false)
+    /** True while an account's sign-in waits for the person to approve it in the Steam app (the screen offers a code instead). */
+    val waitingForApproval: StateFlow<Boolean> = _waitingForApproval
+
+    /** Null when signed in; otherwise why not, in words. Errors included: a failing library must not hide. [preferCode] asks for a typed code even where approving in the app is possible. */
+    suspend fun signIn(context: Context, username: String, password: CharArray, preferCode: Boolean = false): String? = logged(context) {
+      try {
+        SignIn(KeystoreLoginStore(context)).signIn(username, password, object : GuardPrompt {
+            override suspend fun code(kind: GuardKind, previousWasWrong: Boolean): String? {
+                val request = CodeRequest(kind, previousWasWrong, CompletableDeferred())
+                _code.value = request
+                return request.reply.await().also { _code.value = null }
+            }
+            override suspend fun approvedOnPhone(): Boolean { if (!preferCode) _waitingForApproval.value = true; return !preferCode }
+        })
+      } finally { _waitingForApproval.value = false }
+    }
+
+    /** Signing in by approving a link (shown as a QR code, or opened in the Steam app): [onLink] gets the link, and again when it is renewed. Null when signed in. */
+    suspend fun signInWithApproval(context: Context, onLink: (String) -> Unit): String? = logged(context) {
+        SignIn(KeystoreLoginStore(context)).signInWithApproval(onLink)
+    }
+
     private fun describe(t: Throwable): String {
         val result = (t as? AuthenticationException)?.result
         return when (result) {
@@ -92,7 +112,12 @@ object InstallCenter {
             EResult.RateLimitExceeded, EResult.AccountLoginDeniedThrottle -> "Too many tries. Wait a while and try again."
             EResult.TwoFactorCodeMismatch -> "That code was not right."
             EResult.Expired -> "The request timed out."
-            else -> "${t.javaClass.simpleName}: ${t.message ?: "no message"}" + (result?.let { " [$it]" } ?: "")
+            EResult.ServiceUnavailable, EResult.Timeout, EResult.NoConnection -> "The service isn't answering right now. Try again in a minute."
+            else -> when (t) {
+                is kotlinx.coroutines.TimeoutCancellationException -> "Nothing was approved in time. Try again."
+                is java.io.IOException -> t.message ?: "The connection failed."                  // already says which routes failed and why
+                else -> "${t.javaClass.simpleName}: ${t.message ?: "no message"}" + (result?.let { " [$it]" } ?: "")
+            }
         }
     }
 

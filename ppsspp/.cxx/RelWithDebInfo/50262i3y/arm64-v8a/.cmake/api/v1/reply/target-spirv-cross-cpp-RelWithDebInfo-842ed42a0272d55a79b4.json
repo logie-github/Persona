@@ -1,0 +1,391 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "ext/SPIRV-Cross-build/libspirv-cross-cpp.a"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"target_link_libraries",
+			"add_compile_options",
+			"target_compile_options",
+			"add_compile_definitions",
+			"add_definitions",
+			"target_compile_definitions",
+			"include_directories"
+		],
+		"files" : 
+		[
+			"ext/SPIRV-Cross-build/CMakeLists.txt",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 44,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 60,
+				"parent" : 0
+			},
+			{
+				"file" : 1
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 418,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 423,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 427,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 430,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 468,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 471,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 474,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 479,
+				"parent" : 3
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 516,
+				"parent" : 3
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 86,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 1,
+				"line" : 132,
+				"parent" : 3
+			},
+			{
+				"command" : 5,
+				"file" : 1,
+				"line" : 521,
+				"parent" : 3
+			},
+			{
+				"command" : 4,
+				"file" : 1,
+				"line" : 373,
+				"parent" : 3
+			},
+			{
+				"command" : 4,
+				"file" : 1,
+				"line" : 416,
+				"parent" : 3
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 91,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 1,
+				"line" : 370,
+				"parent" : 3
+			},
+			{
+				"command" : 4,
+				"file" : 1,
+				"line" : 14,
+				"parent" : 3
+			},
+			{
+				"command" : 7,
+				"file" : 1,
+				"line" : 299,
+				"parent" : 3
+			},
+			{
+				"command" : 7,
+				"file" : 1,
+				"line" : 303,
+				"parent" : 3
+			},
+			{
+				"command" : 7,
+				"file" : 1,
+				"line" : 358,
+				"parent" : 3
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -O2 -g -DNDEBUG -fPIC"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Werror=return-type"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-unused-function"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-sign-compare"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-unused-but-set-variable"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-reorder"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-unknown-pragmas"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-unused-value"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-unused-variable"
+				},
+				{
+					"backtrace" : 4,
+					"fragment" : "-Wno-error=incompatible-pointer-types"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wno-deprecated-declarations"
+				},
+				{
+					"backtrace" : 5,
+					"fragment" : "-Wno-missing-braces"
+				},
+				{
+					"backtrace" : 6,
+					"fragment" : "-std=c++17"
+				},
+				{
+					"backtrace" : 7,
+					"fragment" : "-Wno-nullability-completeness"
+				},
+				{
+					"backtrace" : 7,
+					"fragment" : "-Wno-tautological-pointer-compare"
+				},
+				{
+					"backtrace" : 7,
+					"fragment" : "-Wno-deprecated-register"
+				},
+				{
+					"backtrace" : 7,
+					"fragment" : "-Wno-sign-conversion"
+				},
+				{
+					"backtrace" : 7,
+					"fragment" : "-Wno-shorten-64-to-32"
+				},
+				{
+					"backtrace" : 8,
+					"fragment" : "-Wformat"
+				},
+				{
+					"backtrace" : 9,
+					"fragment" : "-Wno-multichar"
+				},
+				{
+					"backtrace" : 10,
+					"fragment" : "-fno-strict-aliasing"
+				},
+				{
+					"backtrace" : 11,
+					"fragment" : "-fno-math-errno"
+				},
+				{
+					"backtrace" : 12,
+					"fragment" : "-fsigned-char"
+				},
+				{
+					"backtrace" : 13,
+					"fragment" : "-fno-exceptions"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 14,
+					"define" : "ASSETS_DIR=\"/usr/local/share/ppsspp/assets/\""
+				},
+				{
+					"backtrace" : 15,
+					"define" : "HAVE_GETAUXVAL"
+				},
+				{
+					"backtrace" : 16,
+					"define" : "MOBILE_DEVICE"
+				},
+				{
+					"backtrace" : 17,
+					"define" : "PNG_ARM_NEON_OPT=0"
+				},
+				{
+					"backtrace" : 18,
+					"define" : "SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS"
+				},
+				{
+					"backtrace" : 19,
+					"define" : "USING_GLES2"
+				},
+				{
+					"backtrace" : 20,
+					"define" : "__STDC_CONSTANT_MACROS"
+				},
+				{
+					"backtrace" : 18,
+					"define" : "__STDC_LIMIT_MACROS"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 21,
+					"path" : "/home/user/Persona/build/ppsspp-src/ext/glslang"
+				},
+				{
+					"backtrace" : 22,
+					"path" : "/home/user/Persona/build/ppsspp-src/ext/glew"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/user/Persona/build/ppsspp-src"
+				},
+				{
+					"backtrace" : 2,
+					"path" : "/home/user/Persona/build/ppsspp-src/ext/SPIRV-Cross-build/../SPIRV-Cross"
+				}
+			],
+			"language" : "CXX",
+			"sourceIndexes" : 
+			[
+				1
+			],
+			"sysroot" : 
+			{
+				"path" : "/root/android-sdk/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+			}
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 2,
+			"id" : "spirv-cross-core::@388093a075f87fb6f5fa"
+		},
+		{
+			"backtrace" : 2,
+			"id" : "spirv-cross-glsl::@388093a075f87fb6f5fa"
+		}
+	],
+	"id" : "spirv-cross-cpp::@388093a075f87fb6f5fa",
+	"name" : "spirv-cross-cpp",
+	"nameOnDisk" : "libspirv-cross-cpp.a",
+	"paths" : 
+	{
+		"build" : "ext/SPIRV-Cross-build",
+		"source" : "ext/SPIRV-Cross-build"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Header Files",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		},
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				1
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"path" : "ext/SPIRV-Cross/spirv_cpp.hpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "ext/SPIRV-Cross/spirv_cpp.cpp",
+			"sourceGroupIndex" : 1
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

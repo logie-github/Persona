@@ -58,11 +58,19 @@ Android asks to allow installing from this app, and each update needs its one ta
 
 ## If signing in fails
 
-The dialog now says why. The whole story (the library's own log lines and the error's stack) is in the app's private `files/signin.log`.
-The first sign-in in build 3 and earlier could not start at all: the library that encrypts the password finds its crypto provider
-by class name, and none was bundled (SpongyCastle is now, `app/build.gradle`). A Guard code is typed in the dialog; approving
-in the phone's app instead is not offered. Connections try the direct route (TCP) and then the WebSocket route on port 443, four tries each, with a short timeout; when both fail the
-dialog lists each route's own reason (`Connection`, `openConnection`).
+The sign-in dialog has two tabs. **Approve** shows a QR code (and a button that opens the Steam app on the same phone): approving there finishes the
+sign-in with nothing typed (`SignIn.signInWithApproval`). **Account** takes the name and password; if the account has Steam Guard on a phone, the dialog
+waits for approval in the Steam app and offers "Use a code instead" (it signs in again asking for the code); email codes are typed in the same way.
+This is the same set of ways GameNative offers (QR, password with approval or code); the library is the same (JavaSteam) with SpongyCastle bundled.
+
+Connecting (`openConnection`, `CmDirectory`): web servers on **port 443** first, from the service's own server list (with a built-in list of host names when the
+list can't be fetched), six tries of six seconds, then the direct route. The library's own pick often lands on ports 27017 to 27019, which mobile and public
+networks block, so it is not used first. When nothing connects, the dialog says how each server failed. The whole story (the library's log lines and the
+error's stack) is in the app's private `files/signin.log`. The saved sign-in logs on with a login id of this app's own, so another Steam client on the
+same account doesn't push it off.
+
+Run against the real service from the build machine (no account needed): a made-up account is refused by the service itself with `InvalidPassword` and the
+approval link comes back (`LiveSteamTest`, with `PERSONA_LIVE_STEAM=1`). Not run on a phone.
 
 ## Persona 1's screen (in progress; not wired into the app yet)
 
@@ -105,9 +113,19 @@ dependency). None of PPSSPP's own screens are shown; its settings are the launch
   the untouched image when a mod changes disc files, so removing a mod restores the original.
 - **Touch** (`backend/.../touch/Gestures`, a pure state machine with explicit time): a held swipe anywhere is the d-pad or left stick; one swipe left or
   right is L1 or R1; a held tap is Circle (it combines with a held swipe to run); one tap is Cross; a double tap is Triangle; a swipe in from the right
-  edge is Start; a tap followed by a held tap is one press of Square. PPSSPP's own on-screen buttons are turned off.
+  edge is Start; a tap followed by a held tap is one press of Square; a tap with two fingers opens the menu below. PPSSPP's own on-screen buttons are turned off.
+  The gestures reach the game as a game pad (device 10) pressing Android key codes that `controls.ini` maps to the PSP's buttons (`PspControls`).
+- **In the app** (`app/.../psp`): `PspStore` (the disc and its saves under the game's folder; INSTALL copies a chosen ISO or CSO in and checks it is
+  Persona 1; UNINSTALL removes the disc and the mods and keeps the saves), `PspLauncher` (writes the memory-stick pointer, `ppsspp.ini`, the game's ini and
+  `controls.ini` from the saved OPTIONS, then starts the game), `PspActivity` (the emulator's activity in its own process, `:psp`, so leaving frees all of its
+  memory), `TouchOverlay` (the gestures over the whole screen, nothing drawn; the right edge is excluded from Android's back gesture where Android allows),
+  `PspMenuView` (the menu). The launcher opens on Persona 1.
+- **The menu a two-finger tap opens** (Back opens it too): the game pauses with no emulator screen; rows are RESUME, SAVE STATE, LOAD STATE, then the same OPTIONS
+  rows the launcher has (`PspOptionRows`), and EXIT; once an option has been changed a RESTART row appears. Options are saved at once; the game picks up the
+  per-game ones on RESTART and the renderer (Vulkan or OpenGL) at the next start from the launcher.
 - Nothing of this has run on a phone. The PPSSPP native library builds for arm64 here (about 220 MB unstripped); the gestures, disc reading,
-  options and mod planning are unit-tested; the app screens (import, MODS, OPTIONS, the activity that hosts the emulator) are not written yet.
+  options and mod planning are unit-tested; the app compiles and links with the emulator's Java and resources. Not verified: the gestures on a real screen, the
+  emulator accepting the key codes and the pause key, the restart message, and the edge-swipe exclusion. The MODS screen is not written yet.
 
 ## The app's icon
 

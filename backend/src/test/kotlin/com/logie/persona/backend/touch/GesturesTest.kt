@@ -13,6 +13,7 @@ class GesturesTest {
         val out = object : PadOutput {
             override fun button(button: Pad, down: Boolean) { events += "${if (down) "+" else "-"}$button@$t" }
             override fun stick(x: Float, y: Float) { sticks += x to y }
+            override fun menu() { events += "MENU@$t" }
         }
         val g = Gestures(GestureConfig(dp = 1f, screenWidth = 1000f), out)
         fun at(time: Long, block: () -> Unit) { advance(time); block() }
@@ -97,5 +98,46 @@ class GesturesTest {
     @Test fun resetLetsGoOfEverything() {
         val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.advance(400); assertTrue(r.has(Pad.CIRCLE)); r.at(500) { r.g.reset(500) }
         assertTrue(r.events.last().startsWith("-CIRCLE"))
+    }
+
+    @Test fun aTwoFingerTapAsksForTheMenuAndMakesNoButtonPress() {
+        val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.at(30) { r.g.down(2, 420f, 310f, 30) }
+        r.at(90) { r.g.up(1, 300f, 300f, 90) }; assertTrue(r.events.isEmpty(), "half a two-finger tap does nothing yet")
+        r.at(100) { r.g.up(2, 420f, 310f, 100) }
+        r.advance(1500); assertEquals(listOf("MENU@100"), r.events, "once, and no X, Circle or Triangle")
+    }
+
+    @Test fun twoFingersTappedAFewMillisecondsApartStillCount() {
+        val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.at(100) { r.g.down(2, 420f, 310f, 100) }
+        r.at(150) { r.g.up(2, 420f, 310f, 150) }; r.at(180) { r.g.up(1, 300f, 300f, 180) }
+        r.advance(1500); assertEquals(listOf("MENU@180"), r.events)
+    }
+
+    @Test fun twoFingersThatStayDownAreNotAMenuTap() {
+        val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.at(40) { r.g.down(2, 700f, 300f, 40) }
+        r.advance(500); assertTrue(r.has(Pad.CIRCLE), "the first finger is still a held tap (Circle), a little later than alone")
+        r.at(600) { r.g.up(2, 700f, 300f, 600) }; r.at(650) { r.g.up(1, 300f, 300f, 650) }
+        r.advance(2000); assertFalse(r.events.any { it.startsWith("MENU") })
+    }
+
+    @Test fun aHeldCircleWithAnotherFingerSwipingToRunStillWorks() {
+        val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.at(40) { r.g.down(2, 700f, 300f, 40) }
+        r.at(70) { r.g.move(2, 760f, 300f, 70) }; r.at(120) { r.g.move(2, 800f, 300f, 120) }
+        r.advance(600); assertTrue(r.has(Pad.CIRCLE) && r.has(Pad.RIGHT), "Circle held and the d-pad pressed together")
+        assertFalse(r.events.any { it.startsWith("MENU") })
+    }
+
+    @Test fun twoFingersThatSwipeApartAreNotAMenuTap() {
+        val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.at(20) { r.g.down(2, 400f, 300f, 20) }
+        r.at(50) { r.g.move(1, 200f, 300f, 50) }; r.at(60) { r.g.move(2, 500f, 300f, 60) }
+        r.at(90) { r.g.up(1, 150f, 300f, 90) }; r.at(100) { r.g.up(2, 560f, 300f, 100) }
+        r.advance(1500); assertFalse(r.events.any { it.startsWith("MENU") })
+    }
+
+    @Test fun aTapAfterATwoFingerTapIsStillAnX() {
+        val r = Rig(); r.at(0) { r.g.down(1, 300f, 300f, 0) }; r.at(20) { r.g.down(2, 420f, 310f, 20) }
+        r.at(80) { r.g.up(1, 300f, 300f, 80) }; r.at(85) { r.g.up(2, 420f, 310f, 85) }
+        r.at(1000) { r.g.down(1, 300f, 300f, 1000) }; r.at(1060) { r.g.up(1, 300f, 300f, 1060) }
+        r.advance(2000); assertEquals(listOf(Pad.CROSS), r.downs())
     }
 }

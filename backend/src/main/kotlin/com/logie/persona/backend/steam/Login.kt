@@ -44,6 +44,6 @@ interface GuardPrompt {
     /** The code, or null when the person gave up. */
     suspend fun code(kind: GuardKind, previousWasWrong: Boolean): String?
 
-    /** True when the person approved the sign-in on their phone's Steam app instead of typing a code. */
+    /** True to wait for the person to approve the sign-in in the phone's Steam app (the call comes before the wait starts, so the screen can say so); false to ask for a code instead. */
     suspend fun approvedOnPhone(): Boolean
 }

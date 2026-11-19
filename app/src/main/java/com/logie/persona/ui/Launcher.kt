@@ -19,7 +19,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.logie.persona.backend.catalog.Catalog
 import com.logie.persona.backend.catalog.Game
+import com.logie.persona.backend.catalog.MenuSpec
+import com.logie.persona.backend.catalog.OptionId
 import com.logie.persona.backend.catalog.Origin
+import com.logie.persona.backend.catalog.Runtime
+import com.logie.persona.backend.psp.PspOptionRows
+import com.logie.persona.psp.PspLauncher
+import com.logie.persona.psp.PspStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.logie.persona.backend.catalog.Version
 import com.logie.persona.install.InstallCenter
 import com.logie.persona.install.InstallService
@@ -41,7 +54,7 @@ private val boxColors = mapOf(
 fun Launcher() {
     val context = LocalContext.current
     MaterialTheme(colorScheme = darkColorScheme()) {
-        var selected by remember { mutableStateOf(Catalog.all.last()) }
+        var selected by remember { mutableStateOf(Catalog.all.first()) }
         val versionIds = remember { mutableStateMapOf<String, String>() }
         val version = Catalog.findVersion(versionIds[selected.id]) ?: selected.default
         val states by InstallCenter.state.collectAsState()
@@ -69,9 +82,9 @@ fun Launcher() {
                     }
                 } else Text(version.label, color = Color(0xFFB0B0BC), modifier = Modifier.padding(vertical = 8.dp))
                 Spacer(Modifier.height(8.dp))
-                Action(version, states[version.id] ?: InstallUi.Idle) {
-                    if (InstallCenter.isSignedIn(context)) InstallService.start(context, version.id) else signIn = version
-                }
+                GameMenu(selected, version, states[version.id] ?: InstallUi.Idle,
+                    onVersion = { val i = selected.versions.indexOf(version); versionIds[selected.id] = selected.versions[(i + 1) % selected.versions.size].id },
+                    onSteamInstall = { if (InstallCenter.isSignedIn(context)) InstallService.start(context, version.id) else signIn = version })
             }
         }
         // The one place the store is named: its sign-in, shown once.
@@ -97,20 +110,69 @@ private fun Box(game: Game, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Action(version: Version, ui: InstallUi, onInstall: () -> Unit) {
-    when {
-        version.origin == Origin.DISC_IMAGE -> Button(onClick = {}, enabled = false) { Text(Wording.NEEDS_DISC) }
-        ui is InstallUi.Running -> Column {
+private fun GameMenu(game: Game, version: Version, ui: InstallUi, onVersion: () -> Unit, onSteamInstall: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val psp = version.runtime == Runtime.PSP_EMULATOR
+    var pspInstalled by remember { mutableStateOf(PspStore.isInstalled(context)) }
+    var importing by remember { mutableStateOf<Float?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var showOptions by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            importing = 0f; notice = null
+            val result = withContext(Dispatchers.IO) { PspStore.import(context, uri) { p -> importing = p } }
+            importing = null
+            when (result) { is PspStore.Imported.Ok -> pspInstalled = true; is PspStore.Imported.Refused -> notice = result.why }
+        }
+    }
+    val installed = if (psp) pspInstalled else ui is InstallUi.Done
+    val busy = importing != null || ui is InstallUi.Running
+    Column {
+        MenuSpec.optionsFor(game, version, installed, busy).forEach { o ->
+            val usable = o.enabled && (psp || o.id != OptionId.PLAY) && !(o.id == OptionId.INSTALL && !psp && version.origin == Origin.DISC_IMAGE)
+            TextButton(enabled = usable, onClick = {
+                when (o.id) {
+                    OptionId.PLAY -> notice = PspLauncher.play(context)
+                    OptionId.INSTALL -> if (psp) picker.launch(arrayOf("*/*")) else onSteamInstall()
+                    OptionId.UNINSTALL -> if (psp) { PspStore.uninstall(context); pspInstalled = false } else { InstallCenter.uninstall(context, version) }
+                    OptionId.VERSION -> onVersion()
+                    OptionId.OPTIONS -> showOptions = true
+                    OptionId.MODS -> {}
+                }
+            }) { Text(o.label, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp) }
+        }
+        importing?.let { LinearProgressIndicator(progress = { it }, Modifier.fillMaxWidth().padding(top = 8.dp)) }
+        if (ui is InstallUi.Running) {
             Text(Wording.step(ui.progress.step), color = Color.White)
             LinearProgressIndicator(progress = { ui.progress.fraction }, Modifier.fillMaxWidth().padding(top = 8.dp))
         }
-        ui is InstallUi.Done -> Button(onClick = {}, enabled = false) { Text("Play (the runtime isn't in the app yet)") }
-        ui is InstallUi.NotInLibrary -> Text(Wording.NOT_IN_LIBRARY, color = Color(0xFFFFB4AB))
-        else -> Column {
-            if (ui is InstallUi.Failed) Text(Wording.FAILED, color = Color(0xFFFFB4AB), modifier = Modifier.padding(bottom = 8.dp))
-            Button(onClick = onInstall) { Text(Wording.INSTALL) }
-        }
+        if (ui is InstallUi.NotInLibrary) Text(Wording.NOT_IN_LIBRARY, color = Color(0xFFFFB4AB))
+        if (ui is InstallUi.Failed) Text(Wording.FAILED, color = Color(0xFFFFB4AB))
+        notice?.let { Text(it, color = Color(0xFFFFB4AB)) }
     }
+    if (showOptions && psp) PspOptionsDialog { showOptions = false }
+}
+
+@Composable
+private fun PspOptionsDialog(onClose: () -> Unit) {
+    val context = LocalContext.current
+    var options by remember { mutableStateOf(PspStore.options(context)) }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("OPTIONS") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                PspOptionRows.rows(options).forEach { r ->
+                    Row(Modifier.fillMaxWidth().clickable { options = r.next; PspStore.saveOptions(context, options) }.padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(r.label, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text(r.value, color = Color(0xFFC9B8FF))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("DONE") } },
+    )
 }
 
 @Composable

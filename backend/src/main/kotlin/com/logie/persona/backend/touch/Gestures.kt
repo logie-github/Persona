@@ -11,6 +11,8 @@ interface PadOutput {
     fun button(button: Pad, down: Boolean)
     /** The left stick, each -1..1 (y positive downward, as Android axes are). */
     fun stick(x: Float, y: Float)
+    /** A two-finger tap: the options menu is asked for (the game is the app's to pause). */
+    fun menu() {}
 }
 
 /**
@@ -25,6 +27,7 @@ class GestureConfig(
     val tapMaxMs: Long = 200,          // a touch that lifts within this, without moving, is a tap
     val doubleTapMs: Long = 230,       // a second touch within this of a tap makes a double tap (or a tap and hold)
     val pulseMs: Long = 60,            // how long a single press is held down
+    val twoFingerMs: Long = 120,       // two fingers that come down within this of each other may be a two-finger tap
 ) {
     val slop = 14f * dp                // movement under this is a still finger
     val flickMin = 56f * dp            // a single swipe goes at least this far
@@ -36,7 +39,7 @@ class GestureConfig(
 /**
  * The touch scheme: a held swipe is the d-pad / left stick; a single swipe left or right is L1 or R1; a held tap is Circle (and can be held while
  * swiping, to run); a single tap is X; a double tap is Triangle; a swipe in from the right edge is Start; a tap and then a held tap is one
- * press of Square. Drive it with [down] / [move] / [up], and call [tick] with the time at least every frame (and at [nextDeadline]).
+ * press of Square; a tap with two fingers at once asks for the options menu ([PadOutput.menu]). Drive it with [down] / [move] / [up], and call [tick] with the time at least every frame (and at [nextDeadline]).
  */
 class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
     private enum class Mode { PENDING, SWIPING, STICK, HELD, DONE }
@@ -52,13 +55,21 @@ class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
     private var pendingCross = NONE                     // when a single tap becomes X, unless a second touch comes first
     private var stickOwner = -1
     private var circles = 0
+    private var pair: Pair<Finger, Finger>? = null      // two fingers that came down together: a two-finger tap if both lift quickly without moving
+    private var pairLifted = 0
 
     fun down(id: Int, x: Float, y: Float, t: Long) {
         tick(t)
         // a touch soon after a tap (X waiting) is the second half of a double tap, or of a tap and hold; X waits for it to be settled
         val second = pendingCross != NONE && pendingCross != HOLDING
         if (second) pendingCross = HOLDING
-        fingers[id] = Finger(id, x, y, t, second)
+        val f = Finger(id, x, y, t, second)
+        fingers[id] = f
+        if (pair != null) pair = null                                                     // a third finger: not a two-finger tap
+        else if (!second) {
+            val other = fingers.values.firstOrNull { it !== f && !it.second && it.mode == Mode.PENDING && !it.moved && t - it.t0 <= cfg.twoFingerMs }
+            if (other != null && fingers.size == 2) { pair = other to f; pairLifted = 0 }
+        }
     }
 
     fun move(id: Int, x: Float, y: Float, t: Long) {
@@ -66,6 +77,7 @@ class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
         val dx = x - f.x0; val dy = y - f.y0
         if (!f.moved && hypot(dx, dy) > cfg.slop) {
             f.moved = true
+            if (pair?.let { f === it.first || f === it.second } == true) pair = null          // a finger that goes somewhere is not part of a tap
             if (f.second) fireCross()                                       // the second touch is going somewhere else: the first tap was a tap
             if (f.mode == Mode.PENDING) f.mode = Mode.SWIPING
         }
@@ -76,6 +88,16 @@ class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
     fun up(id: Int, x: Float, y: Float, t: Long) {
         tick(t); val f = fingers.remove(id) ?: return; f.x = x; f.y = y
         val dx = x - f.x0; val dy = y - f.y0; val dur = t - f.t0
+        pair?.let { (a, b) ->
+            if (f === a || f === b) {
+                if (dur <= cfg.tapMaxMs && !f.moved) {
+                    pairLifted++
+                    if (pairLifted == 2) { pair = null; out.menu() }
+                    return                                                                  // half of a two-finger tap makes nothing by itself
+                }
+                pair = null
+            }
+        }
         when (f.mode) {
             Mode.PENDING -> when {
                 dur <= cfg.tapMaxMs && !f.moved -> if (f.second) { pendingCross = NONE; press(Pad.TRIANGLE) } else pendingCross = t + cfg.doubleTapMs
@@ -91,7 +113,7 @@ class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
     /** Lets go of everything (the screen was left, or the game paused). */
     fun reset(t: Long) {
         tick(t); fingers.values.toList().forEach { f -> fingers.remove(f.id); f.dpad?.let { set(it, false) } }
-        stickOwner = -1; circles = 0; pendingCross = NONE; out.stick(0f, 0f)
+        stickOwner = -1; circles = 0; pendingCross = NONE; pair = null; pairLifted = 0; out.stick(0f, 0f)
         held.toList().forEach { set(it, false) }; releases.clear()
     }
 
@@ -100,8 +122,10 @@ class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
         now = maxOf(now, t)
         releases.removeAll { (at, b) -> (at <= now).also { if (it) set(b, false) } }
         if (pendingCross != NONE && pendingCross != HOLDING && pendingCross <= now) { pendingCross = NONE; press(Pad.CROSS) }
+        pair?.let { (a, b) -> if (now - minOf(a.t0, b.t0) > cfg.tapMaxMs) pair = null }          // too slow for a tap: they are what they are
         for (f in fingers.values.toList()) {
             val age = now - f.t0
+            if (pair?.let { f === it.first || f === it.second } == true) continue          // held back: it may be half of a two-finger tap
             if (f.mode == Mode.PENDING && !f.moved && age >= cfg.holdMs) {
                 if (f.second) { pendingCross = NONE; press(Pad.SQUARE); f.mode = Mode.DONE }                    // a tap, then a held tap: one press of Square
                 else { f.mode = Mode.HELD; f.circle = true; circles++; if (circles == 1) set(Pad.CIRCLE, true) }
@@ -116,6 +140,7 @@ class Gestures(private val cfg: GestureConfig, private val out: PadOutput) {
         var best = Long.MAX_VALUE
         releases.forEach { best = minOf(best, it.first) }
         if (pendingCross != NONE && pendingCross != HOLDING) best = minOf(best, pendingCross)
+        pair?.let { (a, b) -> best = minOf(best, minOf(a.t0, b.t0) + cfg.tapMaxMs + 1) }
         for (f in fingers.values) {
             if (f.mode == Mode.PENDING && !f.moved) best = minOf(best, f.t0 + cfg.holdMs)
             if (f.mode == Mode.SWIPING) best = minOf(best, f.t0 + cfg.swipeHoldMs)
