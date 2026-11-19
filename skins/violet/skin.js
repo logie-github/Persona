@@ -1,8 +1,9 @@
-// Persona 1's screen after the reference picture: the disc and moon, the girl (a looping render of her, cut from the picture), and the menu
+// Persona 1's screen after the reference picture: the disc and moon, the girl (her own layers from the picture, skinned live on the GPU), and the menu
 // as warped lettering. Every word's glyph outlines are bent to a quad that follows the rim and fans down the page; the chosen word sits on a
 // skewed white band, and the lettering turns gold exactly where the band falls (a clip), purple elsewhere. The app talks to it through
 // window.Skin and the Android bridge (select / activate).
 import opentype from './vendor/opentype.module.js';
+import { Girl } from './girl.js';
 
 const AW = 1977, AH = 1398;
 const ART = await (await fetch('art.json')).json();
@@ -63,6 +64,7 @@ function layout() {
   const s = Math.min(W / AW, H / AH); L = { W, H, s, ox: (W - AW * s) / 2, oy: (H - AH * s) / 2 };
   $('stage').style.transform = `translate(${L.ox}px, ${L.oy}px) scale(${s})`;
   $('art').setAttribute('transform', `translate(${L.ox} ${L.oy}) scale(${s})`);
+  if (window.__girl) window.__girl.resize(s, devicePixelRatio || 1);
 }
 const rimX = (y, extra) => { const r = ART.disc.r + ART.disc.rim + extra, dy = y - ART.disc.y; return ART.disc.x + Math.sqrt(Math.max(0, r * r - dy * dy)); };
 
@@ -147,31 +149,23 @@ function drawTitle() {
 window.Skin = {
   setState(s) { Object.assign(state, s); buildWords(); pos = state.selected; drawTitle(); draw(); },
   select(i) { select(i); },
-  setGirlVideo(url) { const v = $('girl-video'); v.src = url; v.style.display = ''; $('girl').style.display = 'none'; v.play().catch(() => {}); },
 };
 
 // ---------- the disc, rim, moon and the little squares (SVG, in the art's own units) ----------
-const shardEls = [];
 function buildBackground() {
   const g = $('art'); g.innerHTML = '';
-  const d = ART.disc, m = ART.moon;
+  const d = ART.disc;
   mk('rect', { x: -6000, y: -6000, width: 14000, height: 14000, fill: C.outside }, g);
   mk('circle', { cx: d.x, cy: d.y, r: d.r, fill: C.disc }, g);
   mk('circle', { cx: d.x, cy: d.y, r: d.r + d.rim / 2, fill: 'none', stroke: C.rim, 'stroke-width': d.rim }, g);
-  g.glow = mk('circle', { cx: m.x, cy: m.y, r: m.ring * 1.1, fill: C.moon, opacity: 0.18 }, g);
-  g.ring = mk('circle', { cx: m.x, cy: m.y, r: m.ring, fill: C.ring }, g); g.moon = mk('circle', { cx: m.x, cy: m.y, r: m.r, fill: C.moon }, g);
-  for (const [cx, cy, r] of [[440, 150, 44], [800, 165, 22], [590, 40, 18], [870, 430, 14], [330, 110, 16]]) mk('circle', { cx, cy, r, fill: '#e9dc7a', opacity: 0.55 }, g);
-  ART.shards.filter((s) => Math.max(s.w, s.h) * AH < 190 && Math.max(s.w, s.h) / Math.max(1e-6, Math.min(s.w, s.h)) < 2.4).forEach((s, i) => {
-    const w = s.w * AH, h = s.h * AH; shardEls.push({ e: mk('rect', { x: -w / 2, y: -h / 2, width: w, height: h, fill: C.shard, opacity: 0.9 }, g), cx: s.x * AW, cy: s.y * AH, a: s.a, i });
-  });
 }
-function drift(t) {
-  const k = 1 + 0.010 * Math.sin(t * 2 * Math.PI / 7.5), g = $('art');
-  g.moon.setAttribute('r', ART.moon.r * k); g.ring.setAttribute('r', ART.moon.ring * k);
-  for (const s of shardEls) { const dx = 14 * Math.sin(t * 2 * Math.PI / (11 + s.i) + s.i * 1.7), dy = 22 * Math.sin(t * 2 * Math.PI / (14 + s.i * 0.7) + s.i * 0.9); s.e.setAttribute('transform', `translate(${s.cx + dx} ${s.cy + dy}) rotate(${s.a + 6 * Math.sin(t * 2 * Math.PI / (16 + s.i) + s.i * 2.3)})`); }
-}
+const shardList = ART.shards.filter((s) => Math.max(s.w, s.h) * AH < 190 && Math.max(s.w, s.h) / Math.max(1e-6, Math.min(s.w, s.h)) < 2.4).map((s) => ({ cx: s.x * AW, cy: s.y * AH, w: s.w * AH, h: s.h * AH, a: s.a }));
 
-layout(); buildBackground(); addEventListener('resize', layout);
+buildBackground();
+const girl = window.__girl = new Girl($('girl'), await (await fetch('girl/layers.json')).json(), await (await fetch('girl/rig.json')).json());
+await girl.load('girl/');
+girl.setScene({ moon: ART.moon, colors: { moon: C.moon, ring: C.ring, shard: C.shard }, craters: [[440, 150, 44], [800, 165, 22], [590, 40, 18], [870, 430, 14], [330, 110, 16]], shards: shardList });
+layout(); addEventListener('resize', layout);
 const q = new URLSearchParams(location.search);
 if (q.get('mock')) {
   const sel = +(q.get('sel') || 1);
@@ -184,11 +178,17 @@ if (q.get('mock')) {
   window.Skin.setState({ game: { title: q.get('title') || 'Persona 3', lines: q.get('lines') ? q.get('lines').split('|') : undefined, version: q.get('ver') || 'Portable' }, selected: sel, entries: set.map(([label, , ok]) => ({ label, enabled: ok !== false })), progress: q.get('p') ? { text: 'Installing', fraction: 0.62 } : null });
 }
 let last = performance.now() / 1000; const t0 = last;
+let lastPos = NaN, lastSel = -1, lastCount = -1;
 function frame() {
+  const ms0 = performance.now();
   const now = performance.now() / 1000, dt = Math.min(0.05, now - last); last = now;
   const t = q.get('t') ? +q.get('t') : now - t0;
   vel += ((state.selected - pos) * 140 - vel * 15) * dt; pos += vel * dt;
-  draw(); drift(t);
+  nudgeVel += (-nudge * 70 - nudgeVel * 7) * dt; nudge += nudgeVel * dt; girl.nudgeAngle = nudge;
+  // the lettering is redrawn only while it moves (the words settle in about a third of a second), not sixty times a second for nothing
+  if (Math.abs(pos - lastPos) > 1e-4 || state.selected !== lastSel || state.entries.length !== lastCount) { draw(); lastPos = pos; lastSel = state.selected; lastCount = state.entries.length; }
+  girl.draw(t);
+  if (q.get('perf')) (window.__ms = window.__ms || []).push(performance.now() - ms0);
   requestAnimationFrame(frame);
 }
 frame();

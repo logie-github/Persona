@@ -188,6 +188,23 @@ def setup(width, rest):
     cam.data.type = 'ORTHO'; cam.data.ortho_scale = AW / 1000.0; cam.data.sensor_fit = 'HORIZONTAL'
     cam.location = (0, -5, 0); cam.rotation_euler = (math.radians(90), 0, 0)
 
+def export_rig(arm, path, fps=60):
+    """The baked animation as data, sampled at [fps]: for each sample, each bone's skin matrix as a 2D affine in the art's own units
+    (x' = a x + c y + e, y' = b x + d y + f). The page skins the layers with these on the GPU, so it plays exactly what was keyed here,
+    at the screen's own frame rate, at any size."""
+    sc = bpy.context.scene; names = [b.name for b in arm.pose.bones]
+    def to_world(x, y): return Vector(((x - AW / 2) / 1000.0, 0.0, -(y - AH / 2) / 1000.0))
+    def to_art(v): return (v.x * 1000.0 + AW / 2, -v.z * 1000.0 + AH / 2)
+    n = int(round(LOOP / FPS * fps)); frames = []
+    for i in range(n):
+        t = i * FPS / fps; f0 = int(math.floor(t)); sc.frame_set(f0, subframe=t - f0); bpy.context.view_layer.update(); row = []
+        for pb in arm.pose.bones:
+            M = arm.matrix_world @ pb.matrix @ (arm.matrix_world @ pb.bone.matrix_local).inverted()
+            p0 = to_art(M @ to_world(0, 0)); px = to_art(M @ to_world(1, 0)); py = to_art(M @ to_world(0, 1))
+            row.append([round(px[0] - p0[0], 5), round(px[1] - p0[1], 5), round(py[0] - p0[0], 5), round(py[1] - p0[1], 5), round(p0[0], 3), round(p0[1], 3)])
+        frames.append(row)
+    json.dump({'fps': fps, 'loop': n, 'bones': names, 'frames': frames}, open(path, 'w'), separators=(',', ':'))
+
 def main():
     a = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
     src, out = a[0], a[1]
@@ -202,6 +219,8 @@ def main():
     animate(arm, names)
     setup(width, rest)
     sc = bpy.context.scene
+    if '--export-rig' in a:
+        export_rig(arm, a[a.index('--export-rig') + 1]); return
     todo = [0] if rest else (frames if frames is not None else list(range(LOOP)))
     for f in todo:
         sc.frame_set(f); sc.render.filepath = os.path.join(out, f'frame_{f:03d}.png'); bpy.ops.render.render(write_still=True)

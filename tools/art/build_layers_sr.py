@@ -97,13 +97,45 @@ def main(src, out):
     # the signature and the small figure are not hers: painted out from what is around them (at both sizes)
     sig = poly(h, w, [(0, 1150), (640, 1150), (640, h), (0, h)]) & np.isin(idx, [BLACK, WHITE, GOLD, HAIR2])
     kill = cv2.dilate((sig | poly(h, w, [(652, 1300), (652, 1228), (690, 1192), (745, 1160), (800, 1148), (905, 1148), (905, h), (640, h)])).astype(np.uint8), np.ones((21, 21), np.uint8))
-    # what was under them is spread in from round about (on a quarter-size copy, which keeps it smooth), the tie's lower end redrawn
-    sm = 4
-    small = cv2.resize(img2, (AW * K // sm, AH * K // sm), interpolation=cv2.INTER_AREA)
-    unk = cv2.dilate(cv2.resize(kill.astype(np.uint8), (AW * K // sm, AH * K // sm), interpolation=cv2.INTER_NEAREST), np.ones((9, 9), np.uint8)) * 255
-    spread = cv2.resize(cv2.inpaint(small, unk, 7, cv2.INPAINT_TELEA), (AW * K, AH * K), interpolation=cv2.INTER_CUBIC)
-    k2 = cv2.GaussianBlur(cv2.resize(cv2.dilate(kill.astype(np.uint8), np.ones((7, 7), np.uint8)).astype(np.float32), (AW * K, AH * K), interpolation=cv2.INTER_LINEAR), (0, 0), 3.0)[..., None]
-    img2 = (img2 * (1 - k2) + spread * k2).astype(np.uint8)
+    # What the signature and the small figure hid is drawn in, by hand, as flat shapes continuing the ones round them (colours sampled from the
+    # picture): the sleeve down to the disc's edge, the lavender gap, the torso, and the tie to its point. Smearing the neighbours' colours in gave
+    # soft gradients and a hard-edged block; flat shapes keep the picture's own look. Coordinates are the art's units.
+    kill1 = kill.astype(np.uint8)
+    def sample(x, y, r=6):
+        return img1[y - r:y + r + 1, x - r:x + r + 1].reshape(-1, 3).mean(0)
+    SLEEVE, TORSO, TIE, GAP = sample(312, 1167), sample(500, 1074), sample(600, 1170, 4), sample(520, 1300)
+    # the tie runs on straight down from where it can be seen (its right edge a little right of vertical, its left edge where the torso drapes over it),
+    # to the disc's edge, where it is cut off as everything is
+    TIE_POLY = [(577, 1172), (684, 1172), (677, 1200), (660, 1229), (635, 1257), (584, 1186)]               # the tie ends in a point (the user's drawing: edges meeting at (635, 1257))
+    RIGHT_OF_TIE = [(684, 1172), (780, 1172), (780, 1340), (640, 1340), (635, 1257), (660, 1229), (677, 1200)]
+    SPIKE = [(687, 1146), (770, 1146), (770, 1192), (694, 1192)]                    # a tip of the figure's hair, left over beside the tie
+    DISC_LAV = np.array((250, 176, 216), np.float32)                                    # the disc's own lavender (outside the sleeve, so left clear)
+    SHAPES = [   # (colour, polygon, where it is painted: 'kill' = only where something was hidden, 'all' = everywhere), painted in this order
+        (DISC_LAV, [(0, 1120), (70, 1140), (112, 1165), (110, 1215), (108, 1245), (122, 1272), (150, 1310), (186, 1346), (216, 1372), (300, 1398), (0, 1398)], 'kill'),
+        (SLEEVE, [(70, 1150), (112, 1165), (110, 1215), (108, 1245), (122, 1272), (150, 1310), (186, 1346), (216, 1372), (440, 1372), (462, 1330), (475, 1274), (456, 1217), (440, 1150)], 'sleeve'),
+        (GAP, [(450, 1120), (481, 1186), (494, 1255), (537, 1286), (625, 1305), (640, 1372), (440, 1372), (462, 1330), (475, 1274), (456, 1217)], 'kill'),
+        (TORSO, [(481, 1120), (700, 1100), (905, 1140), (905, 1372), (640, 1372), (625, 1305), (537, 1286), (494, 1255), (481, 1186)], 'kill'),
+        (TORSO, SPIKE, 'all'),
+        (TORSO, RIGHT_OF_TIE, 'all'),
+        (TIE, TIE_POLY, 'all'),
+    ]
+    FOLD = sample(388, 1135, 3)
+    def bez(p0, p1, p2, p3, n=48):
+        t = np.linspace(0, 1, n)[:, None]; return (1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t ** 2 * p2 + t ** 3 * p3
+    def taper(pts, w0, w1):
+        d = np.gradient(pts, axis=0); d /= np.linalg.norm(d, axis=1, keepdims=True); nrm = np.stack([-d[:, 1], d[:, 0]], 1)
+        wd = (w0 + (w1 - w0) * np.linspace(0, 1, len(pts)) ** 0.8)[:, None] / 2
+        return np.vstack([pts + nrm * wd, (pts - nrm * wd)[::-1]])
+    fold_poly = taper(bez(np.array([372, 1196.]), np.array([369, 1240.]), np.array([388, 1288.]), np.array([424, 1336.])), 13.0, 0.6)
+    kill2 = cv2.resize(kill1, (AW * K, AH * K), interpolation=cv2.INTER_NEAREST) > 0
+    kfeather = cv2.GaussianBlur(kill2.astype(np.float32), (0, 0), 1.0)
+    low = np.zeros((AH * K, AW * K), np.float32); low[int(1215 * K):] = 1.0
+    SHAPES.append((FOLD, [tuple(p) for p in fold_poly], 'all'))
+    for col, pts, where in SHAPES:
+        m = np.zeros((AH * K, AW * K), np.uint8); cv2.fillPoly(m, [(np.array(pts, np.float32) * K).astype(np.int32)], 255, lineType=cv2.LINE_AA)
+        m = cv2.GaussianBlur(m, (0, 0), 1.1).astype(np.float32) / 255.0
+        wt = m * (1.0 if where == 'all' else np.maximum(kfeather, low) if where == 'sleeve' else kfeather)
+        img2 = (img2 * (1 - wt[..., None]) + np.array(col, np.float32) * wt[..., None]).astype(np.uint8)
     img1 = cv2.resize(img2, (AW, AH), interpolation=cv2.INTER_AREA); idx = quantise(img1)
 
     left = (xx < 1160) & inside
@@ -132,6 +164,7 @@ def main(src, out):
     purples = np.isin(idx, [VIOLET, MAUVE, DEEP, GOLD, BLACK]) | tie | (np.isin(idx, [WHITE, PALE]) & ~face & (yy > 900) & left)
     body = purples & inside & (xx < 1320) & ~face & ~hair & ~ribbon
     body |= tie
+    body &= inside                                   # the tie's polygon ran past the disc's edge, over the rim, as a block with straight sides
     nb, lb, sb, _ = cv2.connectedComponentsWithStats(cv2.morphologyEx(body.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)), connectivity=8)
     body = lb == (1 + int(np.argmax(sb[1:, 4])))
     pend_c, pend_r = (572, 1050), 54

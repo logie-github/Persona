@@ -63,19 +63,23 @@ in the phone's app instead is not offered. Connections use the WebSocket route o
 
 ## Persona 1's screen (in progress; not wired into the app yet)
 
-After the reference picture of the girl with the moon. Three parts, all in `skins/violet` and `tools/art`:
+After the reference picture of the girl with the moon. All of it is in `skins/violet` (the page) and `tools/art` (how her art is made):
 
-- **The girl** (`tools/art/build_layers_sr.py`, `tools/art/blender/p1_puppet.py`): the high-resolution reference is cut into layers by
-  colour and place (body, pendant, face, ribbon, one continuous hair layer, a small seam filler), each keeping the picture's own pixels
-  (edge pixels re-coloured from the inside so no old background colour fringes). In Blender (bpy, run under Xvfb) each layer is a gridded
-  mesh on a bone rig in the picture's own units; the 96-frame loop is keyed from waves that start and end at rest, parts lag the ones they
-  hang from, and the hair curtains, bangs, ribbon tails and pendant are baked from spring simulations of the head's and body's motion.
-  Frame 0 is the rest pose and matches the picture to about 1 part in 200 on average (hairline edge differences only; the artist's
-  signature and the small figure are left out). Rendered transparent, 1977x1398, then encoded as a looping WebM with alpha.
-- **The menu** (`skins/violet/skin.js`, opentype.js): every word's glyph outlines are warped onto a quad that follows the disc's rim and
-  fans down the page; the chosen word sits on a skewed white band and is gold exactly where the band falls, purple elsewhere.
-- **The words** (`backend/.../catalog/MenuSpec.kt`, tested): PLAY (starts the game), INSTALL (UNINSTALL once installed), VERSION (only where
-  a box has more than one), MODS (PC versions only), OPTIONS (the emulator's, or the game's own: graphics, controls, launch).
+- **Her layers** (`tools/art/build_layers_sr.py`): the high-resolution reference is cut into layers by colour and place (body, pendant, face,
+  ribbon, one continuous hair layer, a small seam filler), each keeping the picture's own pixels, with edge pixels re-coloured from the inside
+  so no old background colour fringes. What the artist's signature and the small figure hid is drawn in by hand as flat shapes in colours
+  sampled from the picture (the sleeve and its fold line, the torso, the tie ending in a point), and nothing of her passes the disc's edge.
+- **Her animation** (`tools/art/blender/p1_puppet.py`, Blender's bpy under Xvfb): each layer is a gridded mesh on a bone rig in the picture's
+  own units; the 4-second loop is keyed from waves that start and end at rest, parts lag the ones they hang from, and the hair curtains, bangs,
+  ribbon tails and pendant are baked from spring simulations. `--export-rig` writes every bone's matrix 60 times a second (`girl/rig.json`).
+  At rest she matches the picture to about 1 part in 200; the live page matches Blender at moving frames to 0.3 in 255.
+- **The page** (`skins/violet/girl.js`, `skin.js`): WebGL2 draws her layers as meshes skinned on the GPU by those matrices, together with the
+  moon, its ring and the drifting squares, at the screen's own resolution and frame rate: per frame it writes two small uniform arrays and draws
+  about thirty primitives (measured: 1.2 ms of the page's own time per frame, 3 ms at the 95th percentile, against 16.7 ms at 60 fps; not
+  measured on a phone). The disc and rim are static SVG; the lettering (opentype.js outlines warped onto quads that follow the rim, the chosen
+  word on a skewed white band and gold exactly where the band falls) is redrawn only while it moves.
+- **The words** (`backend/.../catalog/MenuSpec.kt`, tested): PLAY (starts the game), INSTALL (UNINSTALL once installed), VERSION (only where a
+  box has more than one), MODS (PC versions only), OPTIONS. There is no help text anywhere.
 
-Run the page with any static server and `index.html?mock=1&set=p3&sel=1`. The page talks to the app through `window.Skin.setState` and the
-`Android.select` / `Android.activate` bridge. Other games get their own skins the same way.
+Run the page with any static server and `index.html?mock=1&set=p3&sel=1` (`set=p1` for Persona 1, `t=` to freeze the time). The page talks to
+the app through `window.Skin.setState` and the `Android.select` / `Android.activate` bridge. Other games get their own skins the same way.
