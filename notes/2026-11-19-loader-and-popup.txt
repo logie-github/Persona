@@ -1,0 +1,1 @@
+Windows games start through the emulator's loader with their own files kept, and a closed game shows a pop-up saying whether its report was sent.

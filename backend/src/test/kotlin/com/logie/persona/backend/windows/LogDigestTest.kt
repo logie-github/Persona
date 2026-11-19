@@ -36,4 +36,21 @@ class LogDigestTest {
         assertTrue(out.startsWith("...("))
         assertTrue(out.endsWith("line 2000"))
     }
+
+    @Test fun wineHandlingItsOwnExceptionsIsOneLine() {
+        val block = """
+            008c:trace:seh:dispatch_exception code=6ba (RPC_S_SERVER_UNAVAILABLE) flags=0 addr=000000027FA4D127
+            008c:trace:seh:dispatch_exception rip=000000027fa4d127 rsp=0000000080dee080 rbp=0000000000000000 eflags=00000202
+            008c:trace:seh:call_seh_handlers TEB handler at 000000027F7A58F0 returned 1
+            008c:trace:seh:RtlRestoreContext returning to 000000027F81DA5A stack 0000000080DEF740
+        """.trimIndent()
+        val text = listOf(block, "00dc:trace:loaddll:build_module Loaded L\"D:\\\\game\\\\P4G.exe\" at 0000000140000000: native", block, block,
+            "00dc:trace:seh:dispatch_exception code=c0000005 (EXCEPTION_ACCESS_VIOLATION) flags=0 addr=0000000140001000").joinToString("\n")
+        val out = LogDigest.compact(text)
+        assertEquals(1, Regex("RPC_S_SERVER_UNAVAILABLE\\) flags").findAll(out).count())
+        assertTrue(out.contains("3 times"))
+        assertTrue(out.contains("EXCEPTION_ACCESS_VIOLATION"))
+        assertFalse(out.contains("rip="))
+        assertTrue(out.contains("P4G.exe"))
+    }
 }

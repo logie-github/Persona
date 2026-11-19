@@ -115,6 +115,20 @@ fun Launcher() {
                 }
             }
         }
+        // A Windows game that failed to start or closed by itself: a pop-up, as the Blizzard launcher shows it, with what became of its report.
+        val windows by com.logie.persona.windows.WindowsRuntime.state.collectAsState()
+        (windows as? com.logie.persona.windows.WindowsRuntime.State.Failed)?.let { f ->
+            val title = Catalog.findVersion(f.versionId)?.let { v -> Catalog.gameOf(v).title } ?: "Persona"
+            AlertDialog(
+                onDismissRequest = { com.logie.persona.windows.WindowsRuntime.dismiss() },
+                title = { Text(title.uppercase(), fontWeight = FontWeight.Black, letterSpacing = 2.sp) },
+                text = { Text(f.message) },
+                confirmButton = { TextButton(onClick = { com.logie.persona.windows.WindowsRuntime.dismiss() }) { Text("OK") } },
+                dismissButton = {
+                    if (com.logie.persona.windows.WindowsLogs.exists(context)) TextButton(onClick = { com.logie.persona.windows.WindowsLogs.share(context) }) { Text("SHARE LOG") }
+                },
+            )
+        }
         // A long press on a box: its box art, per version.
         artFor?.let { g -> BoxArtDialog(g, Catalog.findVersion(versionIds[g.id]) ?: g.default, onChanged = { artRevision++ }, onDismiss = { artFor = null }) }
         // The one place the store is named: its sign-in, shown once.

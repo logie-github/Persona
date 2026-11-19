@@ -202,6 +202,15 @@ installer), swaps the game's steam_api libraries for the **Goldberg emulator's**
 Winlator's game screen with its "Virtual Gamepad" on screen. Back opens Winlator's menu (keyboard, controls, exit). A program wrapped by Steam's own DRM
 (a `.bind` section) is noted in `files/windows.log`; it may not start without the Steam client.
 
+**The loader (ColdClient).** PLAY starts a store game the way GameNative does by default: the game keeps its own `steam_api64.dll` (a swapped one is
+put back from its `.orig`), and gbe_fork's loader (`steamclient_loader_x64.exe`, or `_x32` for a 32-bit program: `ColdClient`) starts it from the games'
+Windows at `C:\Program Files (x86)\Steam`, with the emulator's experimental client libraries (`steamclient(64).dll`) where the store's client would be.
+Its settings: `ColdClientLoader.ini` (the program as `D:\<folder>\<exe>`, its folder, the app's number) and the emulator's `steam_settings` beside the
+libraries (account, SteamID, ticket). Games that check their own library, as Denuvo's do, see theirs: Persona 4 Golden closed by itself 3 seconds after
+PLAY with its library swapped (issues #1 and #2). `scripts/prepare-steamemu.sh` puts the loader's files in `assets/steamemu/coldclient` from the
+release's `steamclient_experimental`; a build without them swaps the library as before. The app copies the emulator's files out again whenever the
+build's differ.
+
 **The game's ticket.** Games with Denuvo (Persona 4 Golden, Persona 5 Royal...) check the owner's encrypted app ticket when they start and close without it.
 PLAY signs in with the saved sign-in (`steam/GameTickets`), asks for the game's ticket and writes it, with the account's name and SteamID, into the emulator's
 `steam_settings/configs.user.ini` (`ticket=`, `account_steamid=`: gbe_fork's settings, as GameNative writes them), beside `configs.main.ini`
@@ -215,7 +224,8 @@ a changed driver or DXVK by itself.
 **Logs.** Each start writes `files/windows-session.log` (the one before kept as `.1`): Wine's `err,seh,loaddll` channels (patch 0007) and the session's
 own events (patch 0008), beside the app's notes (`files/windows.log`) and any crash of the app (`files/crash.log`, `PersonaApp`). Box64's own log is
 off (it repeats its settings for every program). When there are logs, the game's screen shows **SHARE LOG**: a short digest as text that pastes whole
-(`LogDigest`: Box64's settings and Windows' own libraries left out, repeats counted, the end kept), how Android says the app's last runs ended
+(`LogDigest`: Box64's settings, Windows' own libraries and Wine's exception registers left out, Wine's own RPC_S_SERVER_UNAVAILABLE at start
+once, repeats counted, the end kept), how Android says the app's last runs ended
 (ApplicationExitInfo: a native crash with its tombstone's readable words, the system ending it, memory), and the full logs as a file beside it.
 
 Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`), the log digest (`LogDigestTest`). The
@@ -227,6 +237,8 @@ whether Persona 4 Golden starts and plays under Winlator on the Fold has not bee
 The app's failures go to this repository as GitHub issues by themselves (labels `bug`, `auto-report`), as the Blizzard launcher's do (`reports/Reports`,
 `backend/reports/Issues`):
 
+- **A pop-up** on the launcher, as the Blizzard launcher shows a failed start: what happened ("Persona 4 Golden closed while starting (3 seconds after
+  PLAY)") and what became of the report ("A report with its log was sent (issue #2)", or why not yet), with OK and SHARE LOG.
 - **A Windows game's session that ends by itself**: Winlator's game screen closes, its program ended (patch 0008) without the player's Exit (patch
   0009), within five minutes of PLAY or with a failing status. The issue holds SHARE LOG's short report (notes, how Android says the app ended, the
   session log's digest) and, as comments, the end of the session's whole log. The game's screen says "It closed while starting" and that a report goes.

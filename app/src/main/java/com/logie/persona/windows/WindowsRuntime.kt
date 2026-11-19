@@ -5,6 +5,7 @@ import android.content.Intent
 import com.logie.persona.backend.catalog.Version
 import com.logie.persona.backend.windows.GameExe
 import com.logie.persona.backend.windows.SteamEmu
+import com.logie.persona.backend.windows.ColdClient
 import com.logie.persona.backend.steam.GameTickets
 import com.logie.persona.install.KeystoreLoginStore
 import com.logie.persona.install.InstallCenter
@@ -30,7 +31,8 @@ import kotlin.coroutines.resume
  *
  * 1. Winlator's runtime is installed, the first time (and after an update that changes it);
  * 2. the games' Windows (one Winlator container, "Persona") is made the first time, with the games' folder as drive D:;
- * 3. the game's Steam libraries are swapped for the Goldberg emulator's ([SteamEmu]): the game runs without the Steam client;
+ * 3. the game is started through the Goldberg emulator's loader ([ColdClient]: the game keeps its own library) with the account's ticket, or,
+ *    in a build without the loader, with its library swapped for the emulator's ([SteamEmu]): the game runs without the store's client;
  * 4. Winlator's game screen starts the game's program, full screen, with Winlator's on-screen gamepad (profile 3, "Virtual Gamepad").
  */
 object WindowsRuntime {
@@ -107,11 +109,28 @@ object WindowsRuntime {
                 .onFailure { log(context, "${version.id}: no game ticket: ${it.message ?: it.javaClass.simpleName}") }.getOrNull()
         }
         ticket?.let { log(context, "${version.id}: game ticket ${it.result}${it.ticketBase64?.let { t -> " (${t.length} chars)" }.orEmpty()}") }
-        withContext(Dispatchers.IO) {
-            emuDir(context)?.let { emu ->
-                SteamEmu.prepare(dir, version.appId ?: 0, emu, ticket?.accountName ?: InstallCenter.accountName(context) ?: "Persona", ticket?.steamId64 ?: 0, ticket?.ticketBase64)
+        val account = ticket?.accountName ?: InstallCenter.accountName(context) ?: "Persona"
+        // What Winlator starts: the game through the emulator's loader (GameNative's default: the game keeps its own library, which Denuvo
+        // checks), else, in a build without the loader, the game itself with its library swapped for the emulator's.
+        val program = withContext(Dispatchers.IO) {
+            val emu = emuDir(context)
+            val cold = emu?.let { File(it, "coldclient") }?.takeIf { ColdClient.available(it) }
+            val appId = version.appId ?: 0
+            val wrapped = if (SteamEmu.isSteamStubbed(exe)) " (a wrapped program, .bind: it may not start without its store's client)" else ""
+            if (cold != null) {
+                val restored = SteamEmu.restore(dir)
+                File(dir, "steam_appid.txt").writeText(appId.toString())
+                val games = gamesDir(context)
+                val steamDir = File(container.rootDir, ".wine/drive_c/Program Files (x86)/Steam")
+                val prepared = ColdClient.prepare(steamDir, cold, appId, exe, ColdClient.windowsPath('D', games, exe), ColdClient.windowsPath('D', games, exe.parentFile!!),
+                    accountName = account, steamId64 = ticket?.steamId64 ?: 0, ticketBase64 = ticket?.ticketBase64)
+                log(context, "${version.id}: ${exe.name}$wrapped through the loader (${prepared.loader.name}; the game's own library${if (restored > 0) ", $restored put back" else ""})")
+                prepared.loader
+            } else {
+                val r = emu?.let { SteamEmu.prepare(dir, appId, it, account, ticket?.steamId64 ?: 0, ticket?.ticketBase64) }
+                log(context, "${version.id}: ${exe.name}$wrapped with the emulator's library (${r?.let { "${it.swapped.size} swapped, ${it.already} already" } ?: "no emulator in this build"})")
+                exe
             }
-            log(context, "${version.id}: ${exe.name}${if (SteamEmu.isSteamStubbed(exe)) " (a wrapped program, .bind: it may not start without its store's client)" else ""}")
         }
 
         _state.value = State.Preparing(version.id, Step.STARTING)
@@ -121,12 +140,12 @@ object WindowsRuntime {
             .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 0).apply()
         val sessionLog = withContext(Dispatchers.IO) { WindowsLogs.newSession(context) }
         lastStart = System.currentTimeMillis(); lastGame = version.id
-        log(context, "${version.id}: starting ${exe.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()})")
+        log(context, "${version.id}: starting ${program.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()})")
         val intent = Intent(context, XServerDisplayActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra("container_id", container.id)
-            // The program's path (Winlator makes it a Windows path on D:).
-            .putExtra("exec_path", exe.path)
+            // The program's path (Winlator makes it a Windows path: D: for the games, C: for the loader in the games' Windows).
+            .putExtra("exec_path", program.path)
             .putExtra("session_log", sessionLog.path)
             // The game's windows full screen, and the on-screen gamepad (patches/winlator/0006).
             .putExtra("force_fullscreen", true)
@@ -134,16 +153,23 @@ object WindowsRuntime {
         context.startActivity(intent)
     }
 
-    /** The Goldberg emulator's libraries (the app's assets, scripts/prepare-steamemu.sh), copied out once; null when the build has none. */
+    /**
+     * The Goldberg emulator's libraries and its loader (the app's assets, scripts/prepare-steamemu.sh: `coldclient/`), copied out again whenever
+     * the build's differ; null when the build has none.
+     */
     private fun emuDir(context: Context): File? {
         val out = File(context.filesDir, "steamemu")
         val names = runCatching { context.assets.list("steamemu")?.toList() }.getOrNull().orEmpty().filter { it.endsWith(".dll") || it == "VERSION" }
         if (names.none { it.endsWith(".dll") }) return null
-        val version = runCatching { context.assets.open("steamemu/VERSION").bufferedReader().readText().trim() }.getOrDefault("")
-        val stamp = File(out, "VERSION")
+        val cold = runCatching { context.assets.list("steamemu/coldclient")?.toList() }.getOrNull().orEmpty().sorted()
+        val version = runCatching { context.assets.open("steamemu/VERSION").bufferedReader().readText().trim() }.getOrDefault("") + " | " + cold.joinToString(",")
+        val stamp = File(out, "STAMP")
         if (!stamp.isFile || stamp.readText().trim() != version) {
             out.mkdirs()
             for (n in names) context.assets.open("steamemu/$n").use { input -> File(out, n).outputStream().use { input.copyTo(it) } }
+            if (cold.isNotEmpty()) File(out, "coldclient").mkdirs()
+            for (n in cold) context.assets.open("steamemu/coldclient/$n").use { input -> File(out, "coldclient/$n").outputStream().use { input.copyTo(it) } }
+            stamp.writeText(version)
         }
         return out
     }

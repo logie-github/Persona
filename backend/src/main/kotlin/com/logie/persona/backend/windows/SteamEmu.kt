@@ -64,7 +64,7 @@ object SteamEmu {
 
     /** True when a program is wrapped by Steam's own DRM (SteamStub: a ".bind" section), which the emulator alone can't start. */
     fun isSteamStubbed(exe: File): Boolean = runCatching {
-        val b = exe.inputStream().use { it.readNBytes(4096) }
+        val b = ByteArray(4096).let { buf -> val n = exe.inputStream().use { it.read(buf) }; buf.copyOf(maxOf(n, 0)) }
         val pe = (b[0x3c].toInt() and 0xff) or ((b[0x3d].toInt() and 0xff) shl 8)
         if (pe + 24 > b.size || b[pe] != 'P'.code.toByte() || b[pe + 1] != 'E'.code.toByte()) return false
         val sections = (b[pe + 6].toInt() and 0xff) or ((b[pe + 7].toInt() and 0xff) shl 8)
