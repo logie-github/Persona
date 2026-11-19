@@ -8,7 +8,20 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/app/steamemu/assets/steamemu"
 if [ -f "$OUT/VERSION" ] && [ "$(cat "$OUT/VERSION")" = "$GBE_TAG" ]; then echo "gbe_fork $GBE_TAG already in $OUT"; exit 0; fi
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-curl -fsSL --retry 4 -o "$tmp/emu.7z" "$GBE_REPO/releases/download/$GBE_TAG/$GBE_ASSET"
+# The release's Windows build: its asset named in steamemu-version.env, else whichever of its assets is the Windows release 7z (the name has
+# changed between releases), found through GitHub's API (with the workflow's token when there is one).
+api="https://api.github.com/repos/${GBE_REPO#https://github.com/}/releases/tags/$GBE_TAG"
+url=$(curl -fsSL --retry 4 ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} "$api" | python3 -c '
+import json, re, sys
+want = sys.argv[1]
+assets = json.load(sys.stdin).get("assets", [])
+names = [a["name"] for a in assets]
+pick = next((a for a in assets if a["name"] == want), None) or next((a for a in assets if re.search(r"(?i)win", a["name"]) and re.search(r"(?i)release", a["name"]) and a["name"].lower().endswith(".7z")), None)
+if not pick: sys.exit("no Windows release 7z among " + ", ".join(names))
+print(pick["browser_download_url"])
+' "$GBE_ASSET")
+echo "gbe_fork $GBE_TAG: $url"
+curl -fsSL --retry 4 -o "$tmp/emu.7z" "$url"
 7z x -y -o"$tmp/x" "$tmp/emu.7z" > /dev/null
 pick() {   # the emulator's regular build of a library (not the experimental one), else any copy
 	f=$(find "$tmp/x" -ipath '*/regular/*' -iname "$1" | head -n 1)

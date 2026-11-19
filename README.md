@@ -84,9 +84,19 @@ same account doesn't push it off.
 Run against the real service from the build machine (no account needed): a made-up account is refused by the service itself with `InvalidPassword` and the
 approval link comes back (`LiveSteamTest`, with `PERSONA_LIVE_STEAM=1`). Not run on a phone.
 
+## The layout
+
+On the open Fold (600 dp wide and more) the app is laid out as the Blizzard launcher is: every game in a list on the left (its box art or numbered box, its
+name, its versions, a green dot when one is installed, blue while one installs; a long press opens BOX ART) and the chosen game's own screen on the right.
+Persona 1's screen is its skin (below); Persona 2 to 5 have themed screens in the game's colours until their own skins are made (Persona 2 crimson, 3 blue,
+4 yellow, 5 red and black: the name large and slanted, the version chips, the menu words with the chosen one on a band, the box's number huge and faint
+behind). On the narrow cover screen the app opens on Persona 1 and Back goes to the shelf of boxes, as before. OPTIONS for a Windows game: the game's screen
+size and the on-screen gamepad (`WindowsOptions`). Pictures from the layout test: `LayoutShotsTest` (Robolectric; the WebView of Persona 1's skin draws
+nothing there).
+
 ## Persona 1's screen
 
-The app opens on it. Back goes to the shelf of boxes; a box opens its game's screen (Persona 2 to 5 have a plain list until their own skins are made).
+The app opens on it on the narrow screen; on the open Fold it is the right-hand side when Persona 1 is chosen.
 `ui/SkinScreen` hosts the page in a WebView, served from the app's assets (`skins/` is added to them by `app/build.gradle`) over an https address that exists only
 inside the app (`WebViewAssetLoader`); the app sends it the menu rows with `window.Skin.setState` (kept in `window.__pending` until the page has loaded) and the page
 calls back `Android.select(i)` and `Android.activate(i)`. The rows are `MenuSpec`'s, built by `ui/GameState`: PLAY, INSTALL or UNINSTALL, MODS, OPTIONS (greyed ones

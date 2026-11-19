@@ -61,7 +61,8 @@ fun rememberGame(game: Game, version: Version, ui: InstallUi, onVersion: () -> U
         // Play needs a runtime (the PSP emulator, or Windows through Winlator; Persona 2's PS1 one isn't in the app yet), and a disc game other than
         // Persona 1 needs its importer.
         val usable = o.enabled && (o.id != OptionId.PLAY || version.runtime != Runtime.PS1_EMULATOR) && !(windowsBusy && o.id == OptionId.PLAY) &&
-            !(o.id == OptionId.INSTALL && !psp && version.origin == Origin.DISC_IMAGE)
+            !(o.id == OptionId.INSTALL && !psp && version.origin == Origin.DISC_IMAGE) &&
+            !(o.id == OptionId.MODS && !psp)          // the PC versions' mod manager isn't made yet
         MenuRow(o.id, o.label, usable)
     }
     val gauge = importing?.let { Gauge("Installing", it) } ?: (ui as? InstallUi.Running)?.let { Gauge(Wording.step(it.progress.step), it.progress.fraction) }
@@ -76,7 +77,7 @@ fun rememberGame(game: Game, version: Version, ui: InstallUi, onVersion: () -> U
         else -> null
     }
     return GameState(
-        rows, gauge, words, showOptions && psp,
+        rows, gauge, words, showOptions,
         perform = { id ->
             when (id) {
                 OptionId.PLAY -> if (psp) notice = PspLauncher.play(context) else { WindowsRuntime.dismiss(); WindowsRuntime.play(context, version) }

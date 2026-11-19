@@ -80,7 +80,8 @@ object WindowsRuntime {
         if (!installed) throw IllegalStateException("The Windows runtime could not be installed (is there enough space?).")
 
         _state.value = State.Preparing(version.id, Step.WINDOWS)
-        val container = container(context)
+        val options = WindowsOptions.load(context)
+        val container = container(context, options.screen)
         withContext(Dispatchers.IO) {
             emuDir(context)?.let { emu -> SteamEmu.prepare(dir, version.appId ?: 0, emu, InstallCenter.accountName(context) ?: "Persona") }
             log(context, "${version.id}: ${exe.name}${if (SteamEmu.isSteamStubbed(exe)) " (wrapped by Steam's DRM: it may not start without the Steam client)" else ""}")
@@ -94,7 +95,7 @@ object WindowsRuntime {
             .putExtra("exec_path", exe.path)
             // The game's windows full screen, and the on-screen gamepad (patches/winlator/0006).
             .putExtra("force_fullscreen", true)
-            .putExtra("controls_profile", GAMEPAD_PROFILE)
+            .apply { if (options.gamepad) putExtra("controls_profile", GAMEPAD_PROFILE) }
         context.startActivity(intent)
     }
 
@@ -115,18 +116,19 @@ object WindowsRuntime {
     private fun log(context: Context, text: String) { runCatching { File(context.filesDir, "windows.log").appendText("${java.util.Date()} $text\n") } }
 
     /** The games' Windows: made the first time; its drives set every time (the games' folder as D:). */
-    private suspend fun container(context: Context): Container {
+    private suspend fun container(context: Context, screen: String): Container {
         val manager = withContext(Dispatchers.IO) { ContainerManager(context) }
         val drives = "D:" + gamesDir(context).path
         manager.containers.firstOrNull { it.name == CONTAINER_NAME }?.let { existing ->
             existing.setDrives(drives)
+            existing.setScreenSize(screen)
             withContext(Dispatchers.IO) { existing.saveData() }
             return existing
         }
         val defaults = Container(0)
         val data = JSONObject()
             .put("name", CONTAINER_NAME)
-            .put("screenSize", "1280x720")
+            .put("screenSize", screen)
             .put("envVars", defaults.getEnvVars())
             .put("graphicsDriver", defaults.getGraphicsDriver())
             .put("dxwrapper", defaults.getDXWrapper())
