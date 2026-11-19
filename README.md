@@ -45,3 +45,11 @@ CI (`.github/workflows/build.yml`) does the same and keeps the debug APK as an a
 
 `app/.../ui` (Launcher, SignInDialog), `app/.../install` (InstallCenter state, InstallService, KeystoreLoginStore,
 Wording: the only text about installs, tested to never name the store).
+
+## Releases and updates
+
+Every push to the default branch (and to `main`, once there is one) builds a release APK, signed with the app's own key, and
+publishes it as the GitHub release `persona-build-N` (N is the version code) with `Persona.apk` attached and the patch notes
+in its description. The app looks at the releases each time it comes to the front (`update/Updater`, at most every five
+minutes), downloads a newer build by itself (resuming after a dropped connection) and opens Android's installer; the first time,
+Android asks to allow installing from this app, and each update needs its one tap. Builds install over each other.

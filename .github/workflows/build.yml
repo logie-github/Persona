@@ -8,6 +8,31 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :backend:test :app:testDebugUnitTest :app:assembleDebug -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=build-${{ github.run_number }}
+      # Release build, signed with the app's own key so each release installs over the last.
+      - run: ./gradlew :backend:test :app:testDebugUnitTest :app:assembleRelease -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
+      - run: cp app/build/outputs/apk/release/app-release.apk Persona.apk
       - uses: actions/upload-artifact@v4
-        with: { name: persona-debug-apk, path: app/build/outputs/apk/debug/app-debug.apk }
+        with: { name: Persona, path: Persona.apk }
+
+  # Only once the APK is built and the tests have passed. The app looks for persona-build-N releases (the number is the
+  # version code) each time it comes to the front and installs a newer one. Released from main and, until there is a
+  # main, from the session branches (ccr-*).
+  release:
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/ccr-'))
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { name: Persona }
+      - name: Patch notes
+        run: scripts/release-notes.sh | tee release-notes.md
+      - name: Release
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: >
+          gh release create "persona-build-${{ github.run_number }}" Persona.apk
+          --repo "${{ github.repository }}"
+          --target "${{ github.sha }}" --title "Persona 1.0.${{ github.run_number }}"
+          --notes-file release-notes.md

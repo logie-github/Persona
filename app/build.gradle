@@ -23,6 +23,9 @@ android {
 		targetSdk = 28
 		versionCode = prop('personaVersionCode', '1').toInteger()
 		versionName = prop('personaVersionName', '1.0')
+		// Updates come from this repository's releases (persona-build-N, N being the version code).
+		buildConfigField "String", "UPDATE_REPO", "\"${prop('personaUpdateRepo', 'logie-github/Persona')}\""
+		buildConfigField "String", "RELEASE_TAG_PREFIX", "\"persona-build\""
 		ndk { abiFilters "arm64-v8a" }
 	}
 
@@ -52,6 +55,13 @@ android {
 		resources { excludes += ['META-INF/{AL2.0,LGPL2.1}', 'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/*.kotlin_module'] }
 	}
 
+	testOptions.unitTests.includeAndroidResources = true
+	testOptions.unitTests.all {
+		systemProperty 'robolectric.graphicsMode', 'NATIVE'
+		systemProperty 'robolectric.dependency.repo.url', 'https://maven-central.storage-download.googleapis.com/maven2'
+		maxHeapSize = '2g'
+	}
+
 	lint { abortOnError = false; checkReleaseBuilds = false }
 }
 
@@ -64,5 +74,7 @@ dependencies {
 	implementation 'androidx.core:core-ktx:1.12.0'
 	implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
 	testImplementation 'junit:junit:4.13.2'
+	testImplementation 'org.robolectric:robolectric:4.16'
+	testImplementation 'androidx.test:core:1.6.1'
 	debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }

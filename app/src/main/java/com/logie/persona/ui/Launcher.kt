@@ -25,6 +25,9 @@ import com.logie.persona.install.InstallCenter
 import com.logie.persona.install.InstallService
 import com.logie.persona.install.InstallUi
 import com.logie.persona.install.Wording
+import com.logie.persona.update.Updater
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 
 private val boxColors = mapOf(
     1 to listOf(Color(0xFF3A1C5A), Color(0xFF12081F)),
@@ -44,10 +47,14 @@ fun Launcher() {
         val states by InstallCenter.state.collectAsState()
         LaunchedEffect(Unit) { InstallCenter.refresh(context, Catalog.all.flatMap { it.versions }) }
         var signIn by remember { mutableStateOf<Version?>(null) }
+        // Each time the app comes to the front: look for a newer build, fetch it and open Android's installer.
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { Updater.retryInstall(context); Updater.checkAndInstall(context) }
+        val update by Updater.state.collectAsState()
 
         Surface(Modifier.fillMaxSize(), color = Color(0xFF0B0B0F)) {
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
                 Text("PERSONA", fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = 6.sp, color = Color.White)
+                UpdateBar(update) { Updater.retryInstall(context) }
                 Spacer(Modifier.height(16.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 8.dp)) {
                     items(Catalog.all) { g -> Box(g, g == selected) { selected = g } }
@@ -103,5 +110,20 @@ private fun Action(version: Version, ui: InstallUi, onInstall: () -> Unit) {
             if (ui is InstallUi.Failed) Text(Wording.FAILED, color = Color(0xFFFFB4AB), modifier = Modifier.padding(bottom = 8.dp))
             Button(onClick = onInstall) { Text(Wording.INSTALL) }
         }
+    }
+}
+
+@Composable
+private fun UpdateBar(state: Updater.State, onRetry: () -> Unit) {
+    when (state) {
+        is Updater.State.Downloading -> Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Text("Updating the app", color = Color(0xFFB0B0BC), fontSize = 12.sp)
+            LinearProgressIndicator(progress = { if (state.total > 0) state.done.toFloat() / state.total else 0f }, Modifier.fillMaxWidth())
+        }
+        is Updater.State.Ready -> if (state.needsPermission) {
+            TextButton(onClick = onRetry) { Text("Allow installing updates, then tap here") }
+        }
+        is Updater.State.Failed -> Text(state.message, color = Color(0xFFFFB4AB), fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+        else -> {}
     }
 }

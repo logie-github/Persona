@@ -1,0 +1,1 @@
+Persona: the app updates itself from new releases.
