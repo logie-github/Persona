@@ -30,6 +30,15 @@ object GameLog {
     /** One line of the programs' output, into its place (and into the run's log file, [com.logie.persona.reports.SessionLog]). */
     internal fun take(line: String) {
         if (fault == null && line.contains("Unhandled ") && line.contains("wine")) fault = line.trim().take(200)
+        // (Persona) The exit trace's calls, each with the library that made it ([ExitTrace]); the relay channel's other lines dropped.
+        if (ExitTrace.isRelay(line)) {
+            if (ExitTrace.wanted(line)) {
+                val named = ExitTrace.named(line.trim()).take(300)
+                synchronized(lines) { if (lines.size >= MAX) lines.removeFirst(); lines.addLast(named) }
+                com.logie.persona.reports.SessionLog.event("relay", named)
+            }
+            return
+        }
         // (Persona) Wine's desktop, every message it gets (the explorer channel): how the session's desktop ended, which the repeat limiter
         // would cut to three lines. A few hundred lines a session.
         if (line.contains(":explorer:")) {
@@ -37,6 +46,7 @@ object GameLog {
             return
         }
         if (line.contains(":loaddll:")) {
+            ExitTrace.loaded(line)
             synchronized(loaded) {
                 if (loaded.size >= MAX_LOADED) loaded.removeFirst()
                 loaded.addLast(line.take(300))
@@ -98,6 +108,7 @@ object GameLog {
 
     internal fun clear() {
         explorerLines = 0
+        ExitTrace.reset()
         synchronized(lines) { lines.clear(); unwinding.clear(); repeats.clear() }
         synchronized(loaded) { loaded.clear() }
         synchronized(notes) { notes.clear() }

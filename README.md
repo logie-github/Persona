@@ -32,7 +32,10 @@ Code: `backend/src/main/kotlin/com/logie/persona/backend/steam` (JavaSteam 1.8.0
 
 ## Next
 
-1. Persona 4 Golden: its session ended 3 seconds after PLAY on the phone (issues #1 to #4); the keeper's log (exit codes, dialogs) says next why.
+1. Persona 4 Golden: its session ends about 0.7 s after the game loads, every run, with the loader (ColdClient) and with the swapped library alike
+   (issues #2 to #4, #7): no fault, no dialog, no wrapper (no `.bind` section), the keeper's log stops at its first second. Its next run traces who
+   ends it (the exit trace, below); GameNative's runs of it work on its bionic container with Proton 9 to 11 (about 57% of 300 recent runs rated 4 or
+   5) and rarely on glibc ones like this app's: that runtime is the fallback if the trace points at Wine itself.
 2. Run Persona 4 Golden on the desktop Wine rig (needs the game's files here), then a phone: copy protection of each title is untested.
 3. Gamepad overlay per game; mod manager (GameBanana source, merge step); emulator boxes for 1 and 2.
 
@@ -286,6 +289,13 @@ The Blizzard launcher's reports, ported whole (`reports/BugReports`, `SessionLog
   failing status is a report, and the launcher's pop-up says so with the issue it became. Each carries the game's log (the libraries loaded, Wine's
   lines, the keeper's log: each program's start and end with its exit code, the game's windows, a dialog box's words, why the session ended; the app's
   notes), the phone's state, and as comments the run's log and Android's log of the app.
+- **The exit trace** (`game/ExitTrace`): after a game's run closed by itself, its next run has Wine's relay channel on for the calls that end a program
+  or start another, and nothing else (`HKCU\Software\Wine\Debug\RelayInclude`: ExitProcess, RtlExitUserProcess, NtTerminateProcess, TerminateProcess,
+  the C runtime's exit, _exit, abort and quick_exit, the message boxes, ExitWindowsEx, PostQuitMessage, CreateProcess, WinExec, ShellExecute). Each call
+  goes into the run's log (`relay`) and the report with the library its return address is in ("Call KERNEL32.ExitProcess(00000003) ret=140001050 (in
+  exitprobe.exe)", as the desktop rig printed it for a stand-in program); the channel's other lines (every window message, each library's start and
+  end) are dropped. Wine traces those window messages whatever the list says, which slows a game: the trace is off again once a run lasts a minute or
+  the player chooses Exit.
 - **The app crashing**: a Java crash is written as a report as the process ends and sent at the next start, with the run's log; a native crash, an ANR,
   Android ending the app for memory (ApplicationExitInfo) are reported at the next start with the log of the run that ended.
 - **PLAY failing** before the game's screen, and an update's download failing: a report with the stack.

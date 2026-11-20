@@ -32,7 +32,11 @@ class GameSession(private val activity: AppCompatActivity, private val gameId: S
 
     private val noWindowReport = Runnable { if (!windowShown && !finished) sendReport("didn't start (no window in 90 s)", "Sent by the app") }
 
-    private val minuteReport = Runnable { if (!finished) sendReport("log after 60 s", "Sent by the app") }
+    private val minuteReport = Runnable {
+        // A minute in: the game runs; its exit trace (if a run before closed by itself) is off from the next run.
+        ExitTrace.disarm(activity, gameId)
+        if (!finished) sendReport("log after 60 s", "Sent by the app")
+    }
 
     private val title: String = Catalog.findVersion(gameId)?.let { v -> "${Catalog.gameOf(v).title} (${v.label})" } ?: gameId
 
@@ -101,6 +105,7 @@ class GameSession(private val activity: AppCompatActivity, private val gameId: S
 
     fun onPlayerExit() {
         playerExit = true
+        ExitTrace.disarm(activity, gameId)
         GameLog.note("the player chose Exit")
     }
 
@@ -128,6 +133,8 @@ class GameSession(private val activity: AppCompatActivity, private val gameId: S
             val what = if (windowShown) "closed by itself ${secs}s after PLAY" else "closed while starting (${secs}s after PLAY, no window)"
             val game = Catalog.findVersion(gameId)?.let { Catalog.gameOf(it).title } ?: "The game"
             val said = "$game ${if (windowShown) "closed by itself" else "closed while starting"} ($secs seconds after PLAY)."
+            // The next run traces who ends it ([ExitTrace]).
+            ExitTrace.arm(activity, gameId)
             WindowsRuntime.closedByItself(gameId, if (BugReports.configured(activity)) "$said Sending a report with its log…" else "$said This build can't send reports; the log is kept on the phone.")
             sendReport(what, "The game's session ended without the player's Exit; Wine's program ended with status $status.") { r ->
                 WindowsRuntime.closedByItself(gameId, "$said ${r.say()}.")
