@@ -105,9 +105,13 @@ fun BoxArtDialog(game: Game, initial: Version, onChanged: () -> Unit, onDismiss:
     }
 }
 
-/** A game's box pictures from SteamGridDB: the game found by name (the others as chips), its pictures in a grid, a tap taking one. Asks for the key first if there is none. */
+/**
+ * A game's pictures from SteamGridDB ([slot]: its boxes, or its logos for a menu's title): the game found by name (the others as chips), its
+ * pictures in a grid, a tap taking one. Asks for the key first if there is none.
+ */
 @Composable
-private fun SteamGridPicker(term: String, onPicked: (File) -> Unit, onDismiss: () -> Unit) {
+internal fun SteamGridPicker(term: String, onPicked: (File) -> Unit, onDismiss: () -> Unit, slot: SteamGrid.Slot = SteamGrid.Slot.BOX) {
+    val box = slot == SteamGrid.Slot.BOX
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var key by remember { mutableStateOf(ArtStore.key(context)) }
@@ -125,8 +129,8 @@ private fun SteamGridPicker(term: String, onPicked: (File) -> Unit, onDismiss: (
     fun load(g: SteamGrid.Game, next: Int) {
         scope.launch {
             busy = true; message = null
-            runCatching { withContext(Dispatchers.IO) { SteamGrid.pictures(key!!, SteamGrid.Slot.BOX, g.id, next) } }
-                .onSuccess { r -> if (next == 0) pictures.clear(); pictures += r.pictures; page = next; hasMore = r.hasMore; if (pictures.isEmpty()) message = "No box pictures for ${g.name}." }
+            runCatching { withContext(Dispatchers.IO) { SteamGrid.pictures(key!!, slot, g.id, next) } }
+                .onSuccess { r -> if (next == 0) pictures.clear(); pictures += r.pictures; page = next; hasMore = r.hasMore; if (pictures.isEmpty()) message = "No ${if (box) "box pictures" else "logos"} for ${g.name}." }
                 .onFailure { message = it.message ?: "Couldn't reach SteamGridDB." }
             busy = false
         }
@@ -174,7 +178,7 @@ private fun SteamGridPicker(term: String, onPicked: (File) -> Unit, onDismiss: (
                 items(pictures, key = { it.id }) { pic ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Box(
-                            Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.05f))
+                            Modifier.fillMaxWidth().aspectRatio(if (box) 2f / 3f else 1.5f).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = if (box) 0.05f else 0.12f))
                                 .border(1.dp, if (taking == pic.id) Lavender else Color.White.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
                                 .clickable(enabled = taking == null) {
                                     taking = pic.id; message = null
@@ -187,7 +191,7 @@ private fun SteamGridPicker(term: String, onPicked: (File) -> Unit, onDismiss: (
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
-                            RemoteThumb(pic.thumb, Modifier.fillMaxSize())
+                            RemoteThumb(pic.thumb, Modifier.fillMaxSize().padding(if (box) 0.dp else 6.dp), if (box) ContentScale.Crop else ContentScale.Fit)
                             if (taking == pic.id) Text("Downloading…", color = Color.White, fontSize = 12.sp, modifier = Modifier.background(Color.Black.copy(alpha = 0.6f)).padding(6.dp))
                         }
                         Text(SteamGrid.resolution(pic), color = Lavender, fontSize = 11.sp, maxLines = 1)
@@ -209,7 +213,7 @@ private val thumbs = object : LruCache<String, Bitmap>(24 * 1024 * 1024) { overr
 
 /** A picture from SteamGridDB's own address, loaded once and kept for the session (no image library in the app). */
 @Composable
-private fun RemoteThumb(url: String, modifier: Modifier) {
+private fun RemoteThumb(url: String, modifier: Modifier, scale: ContentScale = ContentScale.Crop) {
     val bitmap by produceState<Bitmap?>(thumbs.get(url), url) {
         if (value == null && SteamGrid.isSiteUrl(url)) value = withContext(Dispatchers.IO) {
             runCatching {
@@ -219,7 +223,7 @@ private fun RemoteThumb(url: String, modifier: Modifier) {
             }.getOrNull()?.also { thumbs.put(url, it) }
         }
     }
-    bitmap?.let { Image(it.asImageBitmap(), null, modifier, contentScale = ContentScale.Crop) } ?: Spacer(modifier)
+    bitmap?.let { Image(it.asImageBitmap(), null, modifier, contentScale = scale) } ?: Spacer(modifier)
 }
 
 /** Crop to the box's shape: drag to move, pinch or slide to zoom; what the frame shows is what is kept. */

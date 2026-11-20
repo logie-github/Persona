@@ -1,24 +1,13 @@
 package com.logie.persona.ui
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
 
-/** The person's own character pictures and fonts for the games' menus (Settings, Games), in the app's files. */
+/** The person's own fonts for the games' menus (Settings, Games), in the app's files (their pictures: [MenuPictures]). */
 internal object MenuFiles {
-    /** A picture, kept as a PNG (its transparency with it): `files/art/character-pN.png`. */
-    fun setCharacter(context: Context, number: Int, uri: Uri): Boolean = runCatching {
-        val bitmap = context.contentResolver.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it) } ?: return false
-        val target = File(context.filesDir, "art/character-p$number.png").also { it.parentFile?.mkdirs() }
-        target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        MenuAssets.changed()
-        true
-    }.getOrDefault(false)
-
     /** A font file, checked by the phone's own font loader first: `files/fonts/pN.ttf` (or .otf). */
     fun setFont(context: Context, number: Int, uri: Uri): Boolean = runCatching {
         val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }.orEmpty()
@@ -35,8 +24,7 @@ internal object MenuFiles {
         true
     }.getOrDefault(false)
 
-    fun reset(context: Context, number: Int) {
-        File(context.filesDir, "art/character-p$number.png").delete()
+    fun resetFont(context: Context, number: Int) {
         File(context.filesDir, "fonts").listFiles { f -> f.name.startsWith("p$number.") }?.forEach { it.delete() }
         MenuAssets.changed()
     }

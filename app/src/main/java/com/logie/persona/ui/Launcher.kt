@@ -91,6 +91,13 @@ fun Launcher() {
     var settingsOpen by remember { mutableStateOf(false) }
     var optionsFor by remember { mutableStateOf<Version?>(null) }
     var modsOpen by remember { mutableStateOf(false) }
+    var pictureFor by remember { mutableStateOf<Pair<Game, MenuPictures.Kind>?>(null) }
+    var musicFor by remember { mutableStateOf<Game?>(null) }
+
+    // The chosen game's menu music, while the launcher is in sight.
+    LaunchedEffect(selected.number) { com.logie.persona.music.MenuMusic.select(context, selected.number) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) { com.logie.persona.music.MenuMusic.inFront(context, true) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) { com.logie.persona.music.MenuMusic.inFront(context, false) }
 
     // The accent follows the chosen game's colours.
     LaunchedEffect(selected.number) { PersonaColors.of(selected.number).let { Modern.Accent = it.accent; Modern.OnAccent = it.onAccent } }
@@ -104,7 +111,8 @@ fun Launcher() {
                     onVersion = { val i = game.versions.indexOf(version); chooseVersion(game, game.versions[(i + 1) % game.versions.size]) },
                     onSteamInstall = { if (InstallCenter.isSignedIn(context)) InstallService.start(context, version.id) else signIn = version })
                 Box(modifier) {
-                    PersonaMenu(game, version, state, onVersion = { chooseVersion(game, it) })
+                    PersonaMenu(game, version, state, onVersion = { chooseVersion(game, it) },
+                        onHoldTitle = { pictureFor = game to MenuPictures.Kind.LOGO }, onHoldCharacter = { pictureFor = game to MenuPictures.Kind.CHARACTER })
                     TopBar(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 10.dp, end = 14.dp), onMore = { holdFor = game }, onSettings = { settingsOpen = true })
                 }
                 if (state.options) OptionsDialog(version, state.closeOptions)
@@ -133,10 +141,12 @@ fun Launcher() {
 
             holdFor?.let { g ->
                 HoldMenu(g, versionOf(g), onDismiss = { holdFor = null },
-                    onOptions = { optionsFor = versionOf(g) }, onArt = { artFor = g }, onMods = { modsOpen = true })
+                    onOptions = { optionsFor = versionOf(g) }, onArt = { artFor = g }, onMods = { modsOpen = true }, onMusic = { musicFor = g })
             }
             optionsFor?.let { v -> OptionsDialog(v) { optionsFor = null } }
             if (modsOpen) ModsScreen { modsOpen = false }
+            pictureFor?.let { (g, kind) -> MenuPictureDialog(g, kind) { pictureFor = null } }
+            musicFor?.let { g -> MusicDialog(g) { musicFor = null } }
             artFor?.let { g -> BoxArtDialog(g, versionOf(g), onChanged = { artRevision++ }, onDismiss = { artFor = null }) }
             if (settingsOpen) SettingsDialog(versionOf = ::versionOf, artRevision = artRevision, onArt = { artFor = it }, onOptions = { optionsFor = it }, onDismiss = { settingsOpen = false })
             RuntimeOverlay()

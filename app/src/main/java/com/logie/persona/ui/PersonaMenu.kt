@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.LinearProgressIndicator
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -83,7 +85,10 @@ import kotlin.math.sin
  * (Settings, Games: Character), else the app's (`assets/characters/pN.png`), else a stand-in figure.
  */
 @Composable
-internal fun PersonaMenu(game: Game, version: Version, state: GameState, onVersion: (Version) -> Unit, modifier: Modifier = Modifier) {
+internal fun PersonaMenu(
+    game: Game, version: Version, state: GameState, onVersion: (Version) -> Unit, modifier: Modifier = Modifier,
+    onHoldTitle: () -> Unit = {}, onHoldCharacter: () -> Unit = {},
+) {
     val style = MenuStyle.of(game.number)
     val fonts = rememberMenuFonts(game.number)
     val time by rememberSeconds()
@@ -108,7 +113,7 @@ internal fun PersonaMenu(game: Game, version: Version, state: GameState, onVersi
         }
         // The character, in front of the panel, breathing.
         Portrait(
-            game.number, style, time,
+            game.number, style, time, onHoldCharacter,
             Modifier.align(Alignment.BottomEnd)
                 .fillMaxHeight(if (wide) 0.94f else 0.62f)
                 .fillMaxWidth(if (wide) 0.5f else 0.62f)
@@ -127,7 +132,7 @@ internal fun PersonaMenu(game: Game, version: Version, state: GameState, onVersi
         ) {
             // The title on one line: smaller where the screen is narrow (the buttons at the top right take some of it).
             val titleScale = (((if (wide) w * 0.62f else w) - 142.dp) / 330.dp).coerceIn(0.6f, 1f)
-            Box(Modifier.padding(end = if (wide) 0.dp else 104.dp)) { Title(game, version, style, fonts, time, enter.value, titleScale) }
+            Box(Modifier.padding(end = if (wide) 0.dp else 104.dp)) { Title(game, version, style, fonts, time, enter.value, titleScale, onHoldTitle) }
             if (game.versions.size > 1) Versions(game, version, style, fonts, onVersion)
             Spacer(Modifier.height(if (wide) 30.dp else 22.dp))
             state.rows.forEachIndexed { i, row ->
@@ -228,10 +233,32 @@ internal object MenuAssets {
 // The title and the versions
 
 @Composable
-private fun Title(game: Game, version: Version, style: MenuStyle, fonts: MenuFonts, time: Float, enter: Float, scale: Float) {
+private fun Title(game: Game, version: Version, style: MenuStyle, fonts: MenuFonts, time: Float, enter: Float, scale: Float, onHold: () -> Unit) {
     val subtitle = game.title.removePrefix("Persona ${game.number}").removePrefix(":").trim().ifEmpty { if (game.versions.size > 1) "" else version.label }
-    Column(Modifier.padding(top = 14.dp).graphicsLayer { alpha = enter; translationY = (1f - enter) * -40.dp.toPx() }) {
-        if (style.number == 5) {
+    val context = LocalContext.current
+    val revision by MenuAssets.revision.collectAsState()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val logo by produceState(MenuPictures.cached(MenuPictures.Kind.LOGO, game.number), game.number, revision) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { MenuPictures.menuPicture(context, MenuPictures.Kind.LOGO, game.number) }
+    }
+    val logoLook = remember(game.number, revision) { MenuPictures.look(context, MenuPictures.Kind.LOGO, game.number) }
+    Column(
+        Modifier.padding(top = 14.dp).graphicsLayer { alpha = enter; translationY = (1f - enter) * -40.dp.toPx() }
+            .pointerInput(game.number) { detectTapGestures(onLongPress = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onHold() }) },
+    ) {
+        val picture = remember(logo) { logo?.asImageBitmap() }
+        if (picture != null) {
+            // The person's logo in place of the lettering: its own colours (or the game's ink), a hard shadow, at its size.
+            val height = 96.dp * scale * logoLook.size
+            val width = height * (picture.width.toFloat() / picture.height)
+            Box(Modifier.size(width.coerceAtMost(420.dp), height)) {
+                // (Persona 4's own shadow is a light yellow: a logo there gets a dark one, as its lettering's box is.)
+                Image(picture, null, contentScale = ContentScale.Fit, alignment = Alignment.CenterStart, colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (style.number == 4) style.ink else style.shadow),
+                    modifier = Modifier.fillMaxSize().graphicsLayer { translationX = 4.dp.toPx(); translationY = 4.dp.toPx(); alpha = 0.8f })
+                Image(picture, "Logo", contentScale = ContentScale.Fit, alignment = Alignment.CenterStart,
+                    colorFilter = if (logoLook.match) androidx.compose.ui.graphics.ColorFilter.tint(style.ink) else null, modifier = Modifier.fillMaxSize())
+            }
+        } else if (style.number == 5) {
             RansomText("PERSONA 5", fonts, 0, false, time, height = 58.dp)
         } else if (style.number == 3) {
             Text("PERSONA 3", maxLines = 1, softWrap = false, style = fonts.title.copy(fontSize = fonts.title.fontSize * scale, color = style.ink, shadow = Shadow(style.shadow, Offset(5f, 5f), 0f)))
@@ -429,33 +456,54 @@ private fun DrawScope.drawMoon(phase: Float, color: Color) {
 
 // The character
 
-/** Game [number]'s character: the person's picture, the app's, else a stand-in figure in the game's colours. */
+/**
+ * Game [number]'s character: the person's picture, else the app's ([MenuPictures]: in the game's look, at its size, facing the way it was set), else
+ * a stand-in figure in the game's colours; always on the bottom edge. Held, [onHold] (its picture's dialog).
+ */
 @Composable
-private fun Portrait(number: Int, style: MenuStyle, time: Float, modifier: Modifier) {
+private fun Portrait(number: Int, style: MenuStyle, time: Float, onHold: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val revision by MenuAssets.revision.collectAsState()
-    val picture: ImageBitmap? = remember(number, revision) { characterBitmap(context, number) }
-    Box(modifier, contentAlignment = Alignment.BottomCenter) {
-        if (picture != null && number == 3) {
-            CutOut(picture, style, time)
-        } else if (picture != null) {
-            // An outline of the panel's edge colour behind the picture, as the games cut their characters out.
-            Image(picture, null, contentScale = ContentScale.Fit, alignment = Alignment.BottomCenter,
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(style.outline),
-                modifier = Modifier.fillMaxSize().graphicsLayer { translationX = 6.dp.toPx(); translationY = -2.dp.toPx() })
-            Image(picture, "Character", contentScale = ContentScale.Fit, alignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize())
-        } else Canvas(Modifier.fillMaxSize()) { standIn(style, time) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Made off the main thread the first time (the game's look goes over every pixel), then kept.
+    val bitmap by produceState(MenuPictures.cached(MenuPictures.Kind.CHARACTER, number), number, revision) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { MenuPictures.menuPicture(context, MenuPictures.Kind.CHARACTER, number) }
+    }
+    val picture = remember(bitmap) { bitmap?.asImageBitmap() }
+    val look = remember(number, revision) { MenuPictures.look(context, MenuPictures.Kind.CHARACTER, number) }
+    Box(
+        modifier
+            .pointerInput(number) { detectTapGestures(onLongPress = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onHold() }) }
+            .graphicsLayer { scaleX = look.size * (if (look.flip) -1f else 1f); scaleY = look.size; transformOrigin = TransformOrigin(0.5f, 1f) },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        if (picture != null) CutOut(picture, CutOutLook.of(number, style), time)
+        else Canvas(Modifier.fillMaxSize()) { standIn(style, time) }
+    }
+}
+
+/** How each game cuts its character out: the edge's colour, a glow behind (pulsing) or none, and a hard shadow's colour. */
+private class CutOutLook(val edge: Color, val glow: Color?, val shadow: Color, val shadowAlpha: Float) {
+    companion object {
+        fun of(number: Int, style: MenuStyle) = when (number) {
+            1 -> CutOutLook(Color.White, Color(0xFFC9B8FF), Color(0xFF0E0618), 0.6f)
+            2 -> CutOutLook(Color(0xFFF4E9E4), Color(0xFFE0B04A), Color.Black, 0.6f)
+            3 -> CutOutLook(Color.White, style.accentInk, style.shadow, 0.55f)
+            4 -> CutOutLook(Color.White, null, Color(0xFF16120A), 0.85f)
+            else -> CutOutLook(Color.White, null, Color.Black, 0.9f)
+        }
     }
 }
 
 /**
- * A picture cut out all round (Persona 3): a cyan glow behind it, pulsing slowly, then a white edge (the picture's shape in white, moved a
- * little in eight directions), then the picture; one canvas, the picture fitted to the bottom centre.
+ * A picture cut out all round, as the games cut theirs: a glow behind it (pulsing slowly), a hard shadow down and to the right, a white edge (the
+ * picture's shape in the edge's colour, moved a little in eight directions), then the picture; one canvas, the picture fitted to the bottom centre.
  */
 @Composable
-private fun CutOut(picture: ImageBitmap, style: MenuStyle, time: Float) {
-    val white = remember(style) { androidx.compose.ui.graphics.ColorFilter.tint(style.outline) }
-    val glowColor = style.accentInk
+private fun CutOut(picture: ImageBitmap, look: CutOutLook, time: Float) {
+    val edge = remember(look.edge) { androidx.compose.ui.graphics.ColorFilter.tint(look.edge) }
+    val glow = remember(look.glow) { look.glow?.let { androidx.compose.ui.graphics.ColorFilter.tint(it) } }
+    val shadow = remember(look.shadow) { androidx.compose.ui.graphics.ColorFilter.tint(look.shadow) }
     Canvas(Modifier.fillMaxSize()) {
         val k = minOf(size.width / picture.width, size.height / picture.height)
         val w = (picture.width * k).toInt()
@@ -465,30 +513,17 @@ private fun CutOut(picture: ImageBitmap, style: MenuStyle, time: Float) {
         val dst = androidx.compose.ui.unit.IntSize(w, h)
         fun at(dx: Float, dy: Float, filter: androidx.compose.ui.graphics.ColorFilter?, alpha: Float = 1f) =
             drawImage(picture, dstOffset = androidx.compose.ui.unit.IntOffset(x + dx.toInt(), y + dy.toInt()), dstSize = dst, colorFilter = filter, alpha = alpha)
-        val glow = androidx.compose.ui.graphics.ColorFilter.tint(glowColor)
         val g = 12.dp.toPx()
-        val pulse = 0.16f + 0.06f * sin(time * 1.7f)
-        for (d in 0 until 8) {
-            val a = d * PI.toFloat() / 4
-            at(cos(a) * g, sin(a) * g, glow, pulse)
+        if (glow != null) {
+            val pulse = 0.16f + 0.06f * sin(time * 1.7f)
+            for (d in 0 until 8) { val a = d * PI.toFloat() / 4; at(cos(a) * g, sin(a) * g, glow, pulse) }
         }
-        at(g * 0.9f, g * 0.5f, androidx.compose.ui.graphics.ColorFilter.tint(style.shadow), 0.55f)
+        at(g * 0.9f, g * 0.5f, shadow, look.shadowAlpha)
         val e = 3.dp.toPx()
-        for (d in 0 until 8) {
-            val a = d * PI.toFloat() / 4
-            at(cos(a) * e, sin(a) * e, white)
-        }
+        for (d in 0 until 8) { val a = d * PI.toFloat() / 4; at(cos(a) * e, sin(a) * e, edge) }
         at(0f, 0f, null)
     }
 }
-
-/** The character's picture: the person's (Settings, Games: Character), else the app's own (`assets/characters/pN.png`). */
-internal fun characterFile(context: Context, number: Int): File? = File(context.filesDir, "art/character-p$number.png").takeIf { it.isFile }
-
-private fun characterBitmap(context: Context, number: Int): ImageBitmap? = runCatching {
-    characterFile(context, number)?.let { BitmapFactory.decodeFile(it.path) }
-        ?: context.assets.open("characters/p$number.png").use { BitmapFactory.decodeStream(it) }
-}.getOrNull()?.asImageBitmap()
 
 /** A stand-in figure until the game's picture is in: head, hair, collar, coat, in the game's colours, cut out with a white edge. */
 private fun DrawScope.standIn(style: MenuStyle, time: Float) {

@@ -39,6 +39,37 @@ class LayoutShotsTest {
         }
     }
 
+    /**
+     * The person's own pictures in every game: a person on a white background (the app's Persona 3 picture put on white, as a photo would come)
+     * cut out and put in each game's look, and a logo in place of Persona 4's and Persona 5's lettering.
+     */
+    @Test fun aPersonAndALogoInEachGame() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val person = context.assets.open("characters/p3.png").use { android.graphics.BitmapFactory.decodeStream(it) }
+        val photo = Bitmap.createBitmap(person.width + 120, person.height + 80, Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(photo).apply { drawColor(android.graphics.Color.WHITE); drawBitmap(person, 60f, 40f, null) }
+        val photoFile = File(context.cacheDir, "photo.png").also { f -> f.outputStream().use { photo.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        val logo = Bitmap.createBitmap(640, 200, Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(logo).apply {
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = 150f; isFakeBoldText = true; color = android.graphics.Color.rgb(255, 214, 0) }
+            drawText("LOGO", 20f, 160f, paint)
+        }
+        val logoFile = File(context.cacheDir, "logo.png").also { f -> f.outputStream().use { logo.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        for (n in 1..5) {
+            check(MenuPictures.set(context, MenuPictures.Kind.CHARACTER, n, photoFile)) { "the person for $n wasn't kept" }
+        }
+        for (n in listOf(4, 5)) check(MenuPictures.set(context, MenuPictures.Kind.LOGO, n, logoFile))
+        // The pictures made before the screens draw (the menu makes them off the main thread).
+        for (n in 1..5) { MenuPictures.menuPicture(context, MenuPictures.Kind.CHARACTER, n); MenuPictures.menuPicture(context, MenuPictures.Kind.LOGO, n) }
+        compose.mainClock.autoAdvance = false
+        compose.setContent { Launcher() }
+        repeat(8) { compose.mainClock.advanceTimeBy(250) }
+        compose.onNodeWithText("Persona 2").performClick(); repeat(4) { compose.mainClock.advanceTimeBy(250) }
+        for (n in listOf(5, 4, 3, 2, 1)) {
+            compose.onNodeWithText(if (n == 1) "Shin Megami Tensei: Persona" else "Persona $n", substring = true).performClick(); repeat(8) { compose.mainClock.advanceTimeBy(250) }; save("person-p$n")
+        }
+    }
+
     /** The cover screen: the game's menu over a row of boxes. */
     @Config(qualifiers = "w411dp-h860dp-port-xhdpi")
     @Test fun theCoverScreen() {

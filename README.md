@@ -121,13 +121,34 @@ to `ui/Launcher.kt`, `ui/Dialogs.kt` and `ui/Look.kt`), in each game's Persona c
   3's date; Anton, Archivo Black, Abril Fatface, Bowlby One, Rubik Mono One and Bebas Neue (OFL) mixed for Persona 5's ransom notes. A font file the
   person has (the game's own) is set per game in Settings, Games: **Font** (checked by the phone's font loader, kept in `files/fonts/pN.ttf`), and used
   in place of the stand-in (in Persona 5's ransom notes beside the others).
-- **Characters.** Settings, Games: **Character** sets a game's picture (best with a transparent background; kept as `files/art/character-pN.png`); else the
-  app's own (`assets/characters/pN.png`: Persona 2's and Persona 3's are the pictures the user sent, 20 November 2026); else a stand-in figure in the
-  game's colours. A game's name under its box on the narrow screen chooses it as the box does.
+- **Characters and logos** (`ui/MenuPictures.kt`, `ui/MenuLookDialogs.kt`, `backend/art/MenuPicture.kt`). **Hold the character** (the stand-in or the
+  picture) in a game's menu to set its person; **hold the title** to put a logo in place of the lettering (both also in Settings, Games). Each has: **My
+  files** (a logo also **SteamGridDB**, the site's logos for the game, with the key in Settings), **Crop** (a free frame: drag its corners or sides, drag
+  inside to move it; the picture as it came is kept in `files/art-src/`, so the crop can be changed later), **Cut out a plain background** (on: the
+  colour most of the picture's border has, and everything like it the border reaches, is taken away with a softened edge; a photograph's scene or a
+  picture already transparent is left alone), **Size** (50 to 140%), and **Reset** (back to the game's own). What the menu shows (`files/art/<kind>-pN.png`)
+  is the crop, cut and then trimmed of its empty edges, so a person always stands on the menu's bottom edge.
+  - A character also has **In the game's look** (on) with **How much of it** (20 to 200%): the picture's light and dark mapped onto the game's colours
+    (a gradient map mixed with the picture's own colours, so faces stay faces), its contrast and its texture (`GameLook`): Persona 1 violet night;
+    Persona 2 crimson and dusk, harder; Persona 3 deep water, darker towards the feet; Persona 4 the TV's yellow with scan lines; Persona 5 black, red
+    and white, hard, with a halftone in the shadows. It is cut out as each game cuts its own: a white edge, a hard shadow, and a glow behind it pulsing
+    (Persona 1 lavender, 2 gold, 3 cyan). **Face the other way** flips it.
+  - A logo has **In the game's colour** (off: its own colours) and a hard shadow.
+  - With nothing set: the app's own (`assets/characters/pN.png`: Persona 2's and Persona 3's are the pictures the user sent, 20 November 2026, in the
+    game's look too), else a stand-in figure in the game's colours.
+- **Music** (`music/MenuMusic.kt`). **Hold a game's box** (or its row, or More): **Music**. **Soundtrack** opens the game's soundtrack page (the
+  khinsider albums the user named, 18 November 2026) in an in-app browser; tap a track, then its download link, and the song is downloaded as the
+  game's music (the site checks its visitors with a page of its own, which a browser passes and the app's plain downloads didn't from here: the
+  browser hands the app its cookies for the download). **My files** takes a song from the phone. The song (`files/music/pN.<kind>`, checked by the
+  phone's player first) loops while that game's menu is on the screen, fading in and out as games are chosen, and stops while a game plays, while the
+  launcher is out of sight, and while another app has the sound (a call, the person's own music: Android's audio focus). **Volume** per game;
+  **Remove**. While the Music dialog is open its game's song plays.
+- A game's name under its box on the narrow screen chooses it as the box does.
 - **The accent** (buttons, switches, the list's marks) follows the chosen game's colours (`PersonaColors`); Persona 4's yellow carries black type.
-- **More** (or holding a game's row or box) opens its menu: Options, Mods (Persona 1), Box art, Send the log, Uninstall (asks first; saves stay).
+- **More** (or holding a game's row or box) opens its menu: Options, Mods (Persona 1), Box art, Music, Send the log, Uninstall (asks first; saves stay).
 - **The gear** opens Settings: **Launcher** (the account signed in, the SteamGridDB key for Box art, Reports: what became of each report and Send the log
-  now, the app's version) and **Games** (the patch notes, here and nowhere else, then each version's box art and options).
+  now, the app's version) and **Games** (the patch notes, here and nowhere else, then each game's Character, Logo, Music and Font, and each version's
+  box art and options).
 - **PLAY** on a Windows game shows its loading screen in the game's colours (the runtime's install with its percent, setting up, starting) until the game's
   screen is up; a game that fails, or closes by itself, says so in a pop-up with what became of its report.
 - **Updates** download by themselves when the app comes to the front; a banner at the bottom shows the download, then Android's installer.

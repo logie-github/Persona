@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -63,9 +65,9 @@ import kotlinx.coroutines.withContext
 
 // A game's menu (hold its row or box, or More)
 
-/** The menu of a game held, as the Blizzard launcher's: its options, its mods (Persona 1), its box art, its log, and taking it off the phone. */
+/** The menu of a game held, as the Blizzard launcher's: its options, its mods (Persona 1), its box art, its menu's music, its log, and taking it off the phone. */
 @Composable
-internal fun HoldMenu(game: Game, version: Version, onDismiss: () -> Unit, onOptions: () -> Unit, onArt: () -> Unit, onMods: () -> Unit) {
+internal fun HoldMenu(game: Game, version: Version, onDismiss: () -> Unit, onOptions: () -> Unit, onArt: () -> Unit, onMods: () -> Unit, onMusic: () -> Unit) {
     val context = LocalContext.current
     val states by InstallCenter.state.collectAsState()
     var confirm by remember { mutableStateOf(false) }
@@ -76,6 +78,7 @@ internal fun HoldMenu(game: Game, version: Version, onDismiss: () -> Unit, onOpt
             HoldItem(Icons.Default.Build, "Options") { onDismiss(); onOptions() }
             if (version.runtime == Runtime.PSP_EMULATOR) HoldItem(Icons.Default.Star, "Mods") { onDismiss(); onMods() }
             HoldItem(Icons.Default.AccountBox, "Box art") { onDismiss(); onArt() }
+            HoldItem(Icons.Default.PlayArrow, "Music") { onDismiss(); onMusic() }
             HoldItem(Icons.Default.Send, "Send the log") {
                 onDismiss()
                 sendLog(context, "${game.title} (${version.label})")
@@ -371,30 +374,37 @@ internal fun UpdateBanner() {
 }
 
 /**
- * A game's menu: its character (a person picture, best with a transparent background: [characterFile]) and its lettering (a font file the
- * person has, such as the game's own: [customFontFile]); each put back with Reset.
+ * A game's menu: its character and its logo (the same dialogs as holding them in the menu: [MenuPictureDialog]), its music ([MusicDialog]) and its
+ * lettering (a font file the person has, such as the game's own: [customFontFile], put back with Reset).
  */
 @Composable
 private fun MenuLookRow(game: Game) {
     val context = LocalContext.current
     val revision by MenuAssets.revision.collectAsState()
+    val songs by com.logie.persona.music.MenuMusic.revision.collectAsState()
     var message by remember { mutableStateOf<String?>(null) }
-    val pickCharacter = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) message = if (MenuFiles.setCharacter(context, game.number, uri)) null else "That picture couldn't be read."
-    }
+    var picture by remember { mutableStateOf<MenuPictures.Kind?>(null) }
+    var music by remember { mutableStateOf(false) }
     val pickFont = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) message = if (MenuFiles.setFont(context, game.number, uri)) null else "That isn't a font file (.ttf or .otf) the phone can read."
     }
-    val character = remember(revision) { characterFile(context, game.number) != null }
+    val character = remember(revision) { MenuPictures.file(context, MenuPictures.Kind.CHARACTER, game.number) != null }
+    val logo = remember(revision) { MenuPictures.file(context, MenuPictures.Kind.LOGO, game.number) != null }
     val font = remember(revision) { customFontFile(context, game.number) != null }
+    val song = remember(songs) { com.logie.persona.music.MenuMusic.file(context, game.number) != null }
     Text(
-        listOfNotNull(if (character) "your character" else null, if (font) "your font" else null).let { if (it.isEmpty()) "The menu's own character and lettering" else "The menu has ${it.joinToString(" and ")}" },
+        listOfNotNull(if (character) "your character" else null, if (logo) "your logo" else null, if (font) "your font" else null, if (song) "music" else null)
+            .let { if (it.isEmpty()) "The menu's own character and lettering, no music" else "The menu has ${it.joinToString(", ")}" },
         style = MaterialTheme.typography.bodySmall,
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FrameButton("Character", primary = false) { pickCharacter.launch(arrayOf("image/*")) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+        FrameButton("Character", primary = false) { picture = MenuPictures.Kind.CHARACTER }
+        FrameButton("Logo", primary = false) { picture = MenuPictures.Kind.LOGO }
+        FrameButton("Music", primary = false) { music = true }
         FrameButton("Font", primary = false) { pickFont.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream", "*/*")) }
-        if (character || font) FrameButton("Reset", primary = false) { MenuFiles.reset(context, game.number) }
+        if (font) FrameButton("Reset font", primary = false) { MenuFiles.resetFont(context, game.number) }
     }
     message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Modern.Gold) }
+    picture?.let { kind -> MenuPictureDialog(game, kind) { picture = null } }
+    if (music) MusicDialog(game) { music = false }
 }
