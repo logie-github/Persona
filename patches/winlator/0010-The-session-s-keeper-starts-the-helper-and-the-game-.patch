@@ -1,0 +1,139 @@
+From 58456c3a8a6a5907ec1a03253682f05cce636153 Mon Sep 17 00:00:00 2001
+From: persona <persona@users.noreply.github.com>
+Date: Fri, 20 Nov 2026 01:44:25 +0000
+Subject: [PATCH] The session's keeper starts the helper and the game; the
+ game's session object; a grabbed pointer follows the stretch; a bare name has
+ no folder
+
+As the Blizzard launcher's patch 0009: exec_wrapper (borderless.exe) is started in the games' desktop
+before winhandler.exe; FileUtils.getDirname returns an empty folder for a bare name; a pointer grab on a
+window that is not drawn takes the stretch of the window under the pointer. With the extra game_id the
+game screen makes the app's GameSession (its programs' lines into the run's log, the first window, the
+program's end, the player's Exit), as the Blizzard launcher's GestureView does.
+---
+ .../com/winlator/XServerDisplayActivity.java   | 15 ++++++++++++++-
+ .../main/java/com/winlator/core/FileUtils.java |  3 ++-
+ .../winlator/xserver/InputDeviceManager.java   | 18 ++++++++++++++++--
+ 3 files changed, 32 insertions(+), 4 deletions(-)
+
+diff --git a/app/src/main/java/com/winlator/XServerDisplayActivity.java b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+index b8e4ea0..65a1c35 100644
+--- a/app/src/main/java/com/winlator/XServerDisplayActivity.java
++++ b/app/src/main/java/com/winlator/XServerDisplayActivity.java
+@@ -106,6 +106,8 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+     private XServerView xServerView;
+     private InputControlsView inputControlsView;
+     private TouchpadView touchpadView;
++    // Persona app: the game's session (extra "game_id").
++    private com.logie.persona.game.GameSession gameSession;
+     private XEnvironment environment;
+     private DrawerLayout drawerLayout;
+     private Container container;
+@@ -173,6 +175,10 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+                 }
+             });
+         }
++        // Persona app: the game's session, as the Blizzard launcher's game screen has it (extra "game_id"): its programs' lines into the
++        // run's log, the screen's comings and goings, a report when no window came or the game ended by itself.
++        String gameId = getIntent().getStringExtra("game_id");
++        if (gameId != null && !gameId.isEmpty()) gameSession = new com.logie.persona.game.GameSession(this, gameId);
+         Menu menu = navigationView.getMenu();
+         menu.findItem(R.id.menu_item_logs).setVisible(enableLogs);
+         navigationView.setNavigationItemSelectedListener(this);
+@@ -261,6 +267,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+                 if (!flags[0] && window.isRenderable() && !window.getClassName().isEmpty()) {
+                     xServerView.getRenderer().setCursorVisible(true);
+                     preloaderDialog.closeOnUiThread();
++                    if (gameSession != null) runOnUiThread(() -> gameSession.onGameWindowShown(window.getClassName()));
+                     flags[0] = true;
+                 }
+ 
+@@ -418,6 +425,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+             showTouchpadHelpDialog();
+         } else if (id == R.id.menu_item_exit) {
+             personaNote("the player chose Exit");
++            if (gameSession != null) gameSession.onPlayerExit();
+             exit();
+         }
+         return true;
+@@ -564,6 +572,7 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+         guestProgramLauncherComponent.setEnvVars(envVars);
+         guestProgramLauncherComponent.setTerminationCallback((status) -> {
+             personaNote("the session's program ended with status " + status);
++            if (gameSession != null) gameSession.onProgramEnded(status);
+             exit();
+         });
+         environment.addComponent(guestProgramLauncherComponent);
+@@ -1010,7 +1019,11 @@ public class XServerDisplayActivity extends AppCompatActivity implements Navigat
+             cmdArgs += " "+overrideEnvVars.get("EXTRA_EXEC_ARGS");
+             overrideEnvVars.remove("EXTRA_EXEC_ARGS");
+         }
+-        return "C:\\windows\\winhandler.exe "+cmdArgs;
++        // Persona app (the Blizzard launcher's patch 0009): the session's keeper (borderless.exe: the games' desktop takes the mouse,
++        // no title bars, the session ends with the game, each program's start and end with its code in its log) starts winhandler.exe
++        // and the game, when the launcher names it.
++        String wrapper = getIntent().getStringExtra("exec_wrapper");
++        return (wrapper != null && !wrapper.isEmpty() ? wrapper+" " : "")+"C:\\windows\\winhandler.exe "+cmdArgs;
+     }
+ 
+     public XServer getXServer() {
+diff --git a/app/src/main/java/com/winlator/core/FileUtils.java b/app/src/main/java/com/winlator/core/FileUtils.java
+index b503fc0..f819b41 100644
+--- a/app/src/main/java/com/winlator/core/FileUtils.java
++++ b/app/src/main/java/com/winlator/core/FileUtils.java
+@@ -255,7 +255,8 @@ public abstract class FileUtils {
+         if (path == null) return "";
+         path = StringUtils.removeEndSlash(path);
+         int index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+-        return path.substring(0, index);
++        // Persona app (the Blizzard launcher's patch 0009): a bare name has no folder (substring(0, -1) ended the game screen's start).
++        return index < 0 ? "" : path.substring(0, index);
+     }
+ 
+     public static void chmod(File file, int mode) {
+diff --git a/app/src/main/java/com/winlator/xserver/InputDeviceManager.java b/app/src/main/java/com/winlator/xserver/InputDeviceManager.java
+index e785264..80a9b81 100644
+--- a/app/src/main/java/com/winlator/xserver/InputDeviceManager.java
++++ b/app/src/main/java/com/winlator/xserver/InputDeviceManager.java
+@@ -142,6 +142,20 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
+         sendEvent(windowB, Event.ENTER_WINDOW, new EnterNotify(detailB, xServer.windowManager.rootWindow, windowB, null, xB, yB, localPointB[0], localPointB[1], keyButMask, mode, sameScreenAndFocus));
+     }
+ 
++    /**
++     * Persona app (the Blizzard launcher's patch 0009): the stretch to the screen that applies to an event reported to eventWindow. A
++     * pointer grab on a window that is not drawn (Wine's cursor clip) had its events reported in the screen's coordinates as if nothing
++     * were stretched; the stretch of the window under the pointer (or the nearest ancestor that has one) is the one the person touches.
++     */
++    private FullscreenTransformation getFullscreenTransformationFor(Window eventWindow) {
++        FullscreenTransformation fullscreenTransformation = eventWindow.getFullscreenTransformation();
++        if (fullscreenTransformation != null || eventWindow != xServer.grabManager.getWindow()) return fullscreenTransformation;
++        for (Window window = pointWindow; window != null; window = window.getParent()) {
++            if (window.getFullscreenTransformation() != null) return window.getFullscreenTransformation();
++        }
++        return null;
++    }
++
+     @Override
+     public void onPointerButtonPress(Pointer.Button button) {
+         if (xServer.isRelativeMouseMovement()) {
+@@ -194,7 +208,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
+                 short x = xServer.pointer.getX();
+                 short y = xServer.pointer.getY();
+ 
+-                FullscreenTransformation fullscreenTransformation = eventWindow.getFullscreenTransformation();
++                FullscreenTransformation fullscreenTransformation = getFullscreenTransformationFor(eventWindow);
+                 if (fullscreenTransformation != null) {
+                     short[] transformedPoint = fullscreenTransformation.transformPointerCoords(x, y);
+                     x = transformedPoint[0];
+@@ -223,7 +237,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
+         if (grabWindow != null || window != null) {
+             Window eventWindow = window != null ? window : grabWindow;
+ 
+-            FullscreenTransformation fullscreenTransformation = eventWindow.getFullscreenTransformation();
++            FullscreenTransformation fullscreenTransformation = getFullscreenTransformationFor(eventWindow);
+             if (fullscreenTransformation != null) {
+                 short[] transformedPoint = fullscreenTransformation.transformPointerCoords(x, y);
+                 x = transformedPoint[0];
+-- 
+2.43.0
+

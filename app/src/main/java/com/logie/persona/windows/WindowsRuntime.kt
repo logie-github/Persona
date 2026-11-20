@@ -6,6 +6,9 @@ import com.logie.persona.backend.catalog.Version
 import com.logie.persona.backend.windows.GameExe
 import com.logie.persona.backend.windows.SteamEmu
 import com.logie.persona.backend.windows.ColdClient
+import com.logie.persona.game.Borderless
+import com.logie.persona.game.GameLog
+import com.logie.persona.game.WineCrashDialog
 import com.logie.persona.backend.steam.GameTickets
 import com.logie.persona.install.KeystoreLoginStore
 import com.logie.persona.install.InstallCenter
@@ -82,7 +85,11 @@ object WindowsRuntime {
                 // (also an Error: Winlator's native libraries failing to load is an UnsatisfiedLinkError)
                 runCatching { File(app.filesDir, "windows.log").appendText("${java.util.Date()} ${version.id}: ${e.stackTraceToString()}\n") }
                 _state.value = State.Failed(version.id, e.message ?: e.javaClass.simpleName)
-                com.logie.persona.reports.Reports.playFailed(app, version.id, e)
+                // (as the Blizzard launcher reports a failed launch)
+                com.logie.persona.reports.BugReports.report(
+                    app, "${com.logie.persona.backend.catalog.Catalog.gameOf(version).title} (${version.label}) launch", e.message ?: e.javaClass.simpleName,
+                    listOf("Game" to version.id), log = e.stackTraceToString(),
+                )
             }
         }
     }
@@ -110,6 +117,8 @@ object WindowsRuntime {
         }
         ticket?.let { log(context, "${version.id}: game ticket ${it.result}${it.ticketBase64?.let { t -> " (${t.length} chars)" }.orEmpty()}") }
         val account = ticket?.accountName ?: InstallCenter.accountName(context) ?: "Persona"
+        // (kept out of every report: [com.logie.persona.reports.BugReports.redact])
+        if (account != "Persona") com.logie.persona.reports.BugReports.accountName = account
         // What Winlator starts: the game through the emulator's loader (GameNative's default: the game keeps its own library, which Denuvo
         // checks), else, in a build without the loader, the game itself with its library swapped for the emulator's.
         val program = withContext(Dispatchers.IO) {
@@ -138,15 +147,31 @@ object WindowsRuntime {
         android.preference.PreferenceManager.getDefaultSharedPreferences(context).edit()
             // Box64's own log off, as the Blizzard launcher has it: it repeats its settings for every program Wine starts and slows a start.
             .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 0).apply()
-        val sessionLog = withContext(Dispatchers.IO) { WindowsLogs.newSession(context) }
+        val sessionLog = withContext(Dispatchers.IO) { File(context.filesDir, "windows-session.log").also { f -> if (f.isFile) f.renameTo(File(f.path + ".1")) } }
+        // The session's keeper (borderless.exe, tools/borderless: the Blizzard launcher's): started before winhandler.exe and the game
+        // (Winlator patch 0010). Its log of the session (each program's start and end with its code, the game's windows, a dialog's
+        // words, why the session ended) goes into the run's log and the reports ([GameLog.keeperLog]). Without it in place the game
+        // starts as before.
+        val keeper = withContext(Dispatchers.IO) { runCatching { Borderless.install(context, container.rootDir) }.getOrDefault(false) }
+        withContext(Dispatchers.IO) {
+            runCatching { Borderless.logFile(container.rootDir).delete() }
+            runCatching { Borderless.dialogFile(container.rootDir).delete() }
+            // A game that dies of a fault ends without Wine's "Program Error" box: the keeper ends the session and the app reports it.
+            runCatching { WineCrashDialog.apply(container.rootDir) }
+        }
+        GameLog.keeperLog = if (keeper) Borderless.logFile(container.rootDir) else null
+        Borderless.dialogFlag = if (keeper) Borderless.dialogFile(container.rootDir) else null
         lastStart = System.currentTimeMillis(); lastGame = version.id
-        log(context, "${version.id}: starting ${program.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()})")
+        log(context, "${version.id}: starting ${program.path} in container ${container.id} (${container.getScreenSize()}, ${container.getGraphicsDriver()}, ${container.getDXWrapper()} ${container.getDXWrapperConfig()}, Box64 ${container.getBox64Preset()}), keeper $keeper")
         val intent = Intent(context, XServerDisplayActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra("container_id", container.id)
             // The program's path (Winlator makes it a Windows path: D: for the games, C: for the loader in the games' Windows).
             .putExtra("exec_path", program.path)
             .putExtra("session_log", sessionLog.path)
+            // The game's session (GameSession: the run's log, the reports) and its keeper (patches/winlator/0010).
+            .putExtra("game_id", version.id)
+            .apply { if (keeper) putExtra("exec_wrapper", Borderless.command(version.id)) }
             // The game's windows full screen, and the on-screen gamepad (patches/winlator/0006).
             .putExtra("force_fullscreen", true)
             .apply { if (options.gamepad) putExtra("controls_profile", GAMEPAD_PROFILE) }
@@ -174,7 +199,8 @@ object WindowsRuntime {
         return out
     }
 
-    private fun log(context: Context, text: String) { runCatching { File(context.filesDir, "windows.log").appendText("${java.util.Date()} $text\n") } }
+    /** The app's word on a start, into the run's log ([com.logie.persona.reports.SessionLog], as the Blizzard launcher's "windows" lines). */
+    private fun log(@Suppress("UNUSED_PARAMETER") context: Context, text: String) { com.logie.persona.reports.SessionLog.event("windows", text) }
 
     /** The games' Windows: made the first time; its drives set every time (the games' folder as D:). */
     private suspend fun container(context: Context, screen: String): Container {

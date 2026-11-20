@@ -33,8 +33,6 @@ class Gauge(val text: String, val fraction: Float)
 class GameState(
     val rows: List<MenuRow>, val gauge: Gauge?, val notice: String?, val options: Boolean,
     val perform: (OptionId) -> Unit, val closeOptions: () -> Unit, val openMods: Boolean, val closeMods: () -> Unit,
-    /** For a Windows game that has been started: sends what its last session left (WindowsLogs) through the share sheet. */
-    val shareLog: (() -> Unit)? = null,
 )
 
 @Composable
@@ -73,7 +71,6 @@ fun rememberGame(game: Game, version: Version, ui: InstallUi, onVersion: () -> U
         }
     val words = when {
         notice != null -> notice
-        windows is WindowsRuntime.State.Failed && (windows as WindowsRuntime.State.Failed).versionId == version.id -> (windows as WindowsRuntime.State.Failed).message
         ui is InstallUi.NotInLibrary -> Wording.NOT_IN_LIBRARY
         ui is InstallUi.Failed -> Wording.FAILED
         else -> null
@@ -91,7 +88,5 @@ fun rememberGame(game: Game, version: Version, ui: InstallUi, onVersion: () -> U
             }
         },
         closeOptions = { showOptions = false }, openMods = showMods && psp, closeMods = { showMods = false },
-        shareLog = if (version.runtime == Runtime.WINLATOR && windows !is WindowsRuntime.State.Preparing && com.logie.persona.windows.WindowsLogs.exists(context))
-            ({ com.logie.persona.windows.WindowsLogs.share(context) }) else null,
     )
 }

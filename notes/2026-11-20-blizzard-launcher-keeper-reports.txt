@@ -1,0 +1,1 @@
+The launcher is laid out as the Blizzard app's, every game in its Persona colours; games start through the session keeper and failures report themselves with full logs.

@@ -32,20 +32,21 @@ Code: `backend/src/main/kotlin/com/logie/persona/backend/steam` (JavaSteam 1.8.0
 
 ## Next
 
-1. Bring in the Winlator runtime through `patches/winlator` (Blizzard's way) and make Play start the game.
-2. Run Persona 4 Golden on the desktop Wine rig, then a phone: copy protection of each title is untested.
+1. Persona 4 Golden: its session ended 3 seconds after PLAY on the phone (issues #1 to #4); the keeper's log (exit codes, dialogs) says next why.
+2. Run Persona 4 Golden on the desktop Wine rig (needs the game's files here), then a phone: copy protection of each title is untested.
 3. Gamepad overlay per game; mod manager (GameBanana source, merge step); emulator boxes for 1 and 2.
 
 ## Building
 
-`sh scripts/prepare-ppsspp.sh` once (it clones the PSP emulator's source at the tag in `ppsspp-version.env` into `build/ppsspp-src` and applies
+`sh scripts/prepare-ppsspp.sh`, `scripts/prepare-winlator.sh`, `scripts/prepare-steamemu.sh` and `scripts/build-keeper.sh` once (it clones the PSP emulator's source at the tag in `ppsspp-version.env` into `build/ppsspp-src` and applies
 `patches/ppsspp`), then `./gradlew :backend:test :app:testDebugUnitTest :app:assembleDebug` (JDK 17, Android SDK 35, NDK 29.0.14206865 and CMake 3.22.1
 for the emulator's native code; `local.properties` needs `sdk.dir`). `-PpspNative=false` leaves the emulator's native code out for quick checks.
 CI (`.github/workflows/build.yml`) does the same and keeps the APK as an artifact.
 
 ## App layout
 
-`app/.../ui` (Launcher, SignInDialog), `app/.../install` (InstallCenter state, InstallService, KeystoreLoginStore,
+`app/.../ui` (Launcher, Dialogs, Look, SignInDialog), `app/.../reports` and `app/.../game` (the Blizzard launcher's reports, logs and session
+keeper), `app/.../install` (InstallCenter state, InstallService, KeystoreLoginStore,
 Wording: the only text about installs, tested to never name the store).
 
 ## Releases and updates
@@ -86,48 +87,25 @@ approval link comes back (`LiveSteamTest`, with `PERSONA_LIVE_STEAM=1`). Not run
 
 ## The layout
 
-On the open Fold (600 dp wide and more) the app is laid out as the Blizzard launcher is: every game in a list on the left (its box art or numbered box, its
-name, its versions, a green dot when one is installed, blue while one installs; a long press opens BOX ART) and the chosen game's own screen on the right.
-Persona 1's screen is its skin (below); Persona 2 to 5 have themed screens in the game's colours until their own skins are made (Persona 2 crimson, 3 blue,
-4 yellow, 5 red and black: the name large and slanted, the version chips, the menu words with the chosen one on a band, the box's number huge and faint
-behind). On the narrow cover screen the app opens on Persona 1 and Back goes to the shelf of boxes, as before. OPTIONS for a Windows game: the game's screen
-size and the on-screen gamepad (`WindowsOptions`). Pictures from the layout test: `LayoutShotsTest` (Robolectric; the WebView of Persona 1's skin draws
-nothing there).
+The launcher is the Blizzard launcher's (its `ModernHome`, `Launcher`, `HoldMenu`, `SettingsDialog`, `UpdateBanner` and runtime loading screen, ported
+to `ui/Launcher.kt`, `ui/Dialogs.kt` and `ui/Look.kt`), in each game's Persona colours:
 
-## Persona 1's screen
+- **The home.** On the open Fold (600 dp and more) every game is in a list on the left (its box art or numbered box, its name, its versions, a green
+  dot when one is installed, the accent's while one installs) and the chosen game's own screen on the right; on the cover screen the game's screen with a
+  row of boxes under it (the chosen one raised). The game chosen, and each game's version, are kept between starts.
+- **A game's screen** is its Persona look (what Persona 2 to 5 had; Persona 1 now has it too, in its violet): the game's colours, its number huge and faint
+  behind, "PERSONA N" large and slanted, its subtitle, its versions as slanted chips, and its menu words (`MenuSpec`: PLAY, INSTALL or UNINSTALL, VERSION,
+  MODS, OPTIONS) with the chosen one on a band: tap a word to choose it, tap it again to do it. Persona 2 crimson, 3 blue, 4 yellow, 5 red and black.
+- **The accent** (buttons, switches, the list's marks) follows the chosen game's colours (`PersonaColors`); Persona 4's yellow carries black type.
+- **More** (or holding a game's row or box) opens its menu: Options, Mods (Persona 1), Box art, Send the log, Uninstall (asks first; saves stay).
+- **The gear** opens Settings: **Launcher** (the account signed in, the SteamGridDB key for Box art, Reports: what became of each report and Send the log
+  now, the app's version) and **Games** (the patch notes, here and nowhere else, then each version's box art and options).
+- **PLAY** on a Windows game shows its loading screen in the game's colours (the runtime's install with its percent, setting up, starting) until the game's
+  screen is up; a game that fails, or closes by itself, says so in a pop-up with what became of its report.
+- **Updates** download by themselves when the app comes to the front; a banner at the bottom shows the download, then Android's installer.
 
-The app opens on it on the narrow screen; on the open Fold it is the right-hand side when Persona 1 is chosen.
-`ui/SkinScreen` hosts the page in a WebView, served from the app's assets (`skins/` is added to them by `app/build.gradle`) over an https address that exists only
-inside the app (`WebViewAssetLoader`); the app sends it the menu rows with `window.Skin.setState` (kept in `window.__pending` until the page has loaded) and the page
-calls back `Android.select(i)` and `Android.activate(i)`. The rows are `MenuSpec`'s, built by `ui/GameState`: PLAY, INSTALL or UNINSTALL, MODS, OPTIONS (greyed ones
-can't be activated; the chosen word starts on the first usable one). Checked here in a desktop browser with the same address layout and an `Android` stand-in
-(screens look as the reference); not run in a phone's WebView.
-
-After the reference picture of the girl with the moon. All of it is in `skins/violet` (the page) and `tools/art` (how her art is made):
-
-- **Her layers** (`tools/art/build_layers_sr.py`): the high-resolution reference is cut into layers by colour and place (body, pendant, face,
-  ribbon, one continuous hair layer, a small seam filler), each keeping the picture's own pixels, with edge pixels re-coloured from the inside
-  so no old background colour fringes. What the artist's signature and the small figure hid is drawn in by hand as flat shapes in colours
-  sampled from the picture (the sleeve and its fold line, the torso, the tie ending in a point), and nothing of her passes the disc's edge.
-- **Where the face meets the hair** (`refine_head` in the same script, after the user's marks on the phone's recording): the picture's lavender glow along each
-  strand is moved from the face to the hair layer, unmixed over the face's own flat colour so the still picture is unchanged, and the face under and near the hair
-  is that flat colour only. When the bangs move, the glow goes with them (before, it stayed on the face as a second outline, with dark slivers between). The black
-  wedge between the left curtain and the collar is hair now (it broke into black and white pieces as the curtain swung), light specks at the strands' tips take the
-  hair's colour, and the pendant's cord stays as drawn. Checked by rendering the live page at eight moments of the loop before and after; not on a phone.
-- **Her animation** (`tools/art/blender/p1_puppet.py`, Blender's bpy under Xvfb): each layer is a gridded mesh on a bone rig in the picture's
-  own units; the 4-second loop is keyed from waves that start and end at rest, parts lag the ones they hang from, and the hair curtains, bangs,
-  ribbon tails and pendant are baked from spring simulations. `--export-rig` writes every bone's matrix 60 times a second (`girl/rig.json`).
-  At rest she matches the picture to about 1 part in 200; the live page matches Blender at moving frames to 0.3 in 255.
-- **The page** (`skins/violet/girl.js`, `skin.js`): WebGL2 draws her layers as meshes skinned on the GPU by those matrices, together with the
-  moon, its ring and the drifting squares, at the screen's own resolution and frame rate: per frame it writes two small uniform arrays and draws
-  about thirty primitives (measured: 1.2 ms of the page's own time per frame, 3 ms at the 95th percentile, against 16.7 ms at 60 fps; not
-  measured on a phone). The disc and rim are static SVG; the lettering (opentype.js outlines warped onto quads that follow the rim, the chosen
-  word on a skewed white band and gold exactly where the band falls) is redrawn only while it moves.
-- **The words** (`backend/.../catalog/MenuSpec.kt`, tested): PLAY (starts the game), INSTALL (UNINSTALL once installed), VERSION (only where a
-  box has more than one), MODS (PC versions only), OPTIONS. There is no help text anywhere.
-
-Run the page with any static server and `index.html?mock=1&set=p3&sel=1` (`set=p1` for Persona 1, `t=` to freeze the time). The page talks to
-the app through `window.Skin.setState` and the `Android.select` / `Android.activate` bridge. Other games get their own skins the same way.
+The Persona 1 skin (`skins/violet`, the WebView page with the girl and the moon) is no longer in the app (the user, 20 November 2026: "Use the persona 2-5
+theme and do away with the persona 1 look"); its files stay in the repository. Pictures from the layout test: `LayoutShotsTest` (Robolectric).
 
 ## Persona 1 on the PSP emulator
 
@@ -191,7 +169,8 @@ warnings again: `cFlags` in `app/build.gradle`); its prebuilt C++ runtime is mad
 Patches (`patches/winlator`): 0001 the runtime in the app's data folder and leaving the game returns to the launcher; 0002 resource ids as variables (the
 app's R isn't final); 0003 the runtime installed without Winlator's screens; 0004 the program's arguments apart from its path; 0005 no window picture without
 a GL context (a crash fix); 0006 a game started with on-screen controls (`controls_profile`) and full-screen windows (`force_fullscreen`); 0007 the session's programs' output (Wine, Box64, the game)
-written to the file named by the `session_log` extra; 0008 the session's own events in that log (`[persona]` lines: the command started with
+written to the file named by the `session_log` extra; 0010 the session's keeper (the Blizzard launcher's patch 0009: `exec_wrapper`,
+`FileUtils.getDirname` of a bare name, a grabbed pointer's stretch) and the game's session (`game_id`: `GameSession`); 0008 the session's own events in that log (`[persona]` lines: the command started with
 its graphics driver, Direct3D layer and Box64 preset, the status its program ended with, the game screen closing); 0009 the player's Exit from
 Winlator's menu noted there (a session that ends without it ended by itself). 0001 to 0005 are the Blizzard launcher's.
 
@@ -215,47 +194,55 @@ program at `D:\testgame\Game.exe` (a stand-in: no game files on that machine) on
 `HKCU\Software\Valve\Steam\ActiveProcess` (`SteamClientDll64` = the emulator's `steamclient64.dll`), where a game's own library looks for its client.
 Persona 4 Golden itself has not been run that way here.
 
+**The session's keeper.** Every Windows game is started through the Blizzard launcher's keeper, `borderless.exe` (`tools/borderless/borderless.c`,
+built with Zig by `scripts/build-keeper.sh` into `app/keeper/assets`; `keeper.env` pins Zig; `game/Borderless`): Winlator's game screen starts it
+before `winhandler.exe` in the games' desktop (patch 0010's `exec_wrapper` extra). It makes the games' desktop the one input goes to, takes the title
+bars off the game's windows and fits them to the screen, ends the session when no program of the game's is left, and writes its log
+(`C:\windows\borderless.log`: each program's start and end with its exit code, the game's windows, a dialog box's words, why the session ended), which
+goes into the run's log and the reports. Wine's crash box is off (`WineCrashDialog`): a program that dies of a fault ends, and the app reports it. Run
+here under Winlator's Wine with the loader and a stand-in game (a window for five seconds, exit code 7): the keeper logged both programs, the window,
+the frame taken off, "program ended: Game.exe (pid 324, code 0x00000007)" and ended the session three seconds later.
+
 **The game's ticket.** Games with Denuvo (Persona 4 Golden, Persona 5 Royal...) check the owner's encrypted app ticket when they start and close without it.
 PLAY signs in with the saved sign-in (`steam/GameTickets`), asks for the game's ticket and writes it, with the account's name and SteamID, into the emulator's
 `steam_settings/configs.user.ini` (`ticket=`, `account_steamid=`: gbe_fork's settings, as GameNative writes them), beside `configs.main.ini`
 (`disable_lan_only=1`). The ticket is fetched at every start (it is short-lived), so PLAY needs the network; without it the game starts with no ticket,
-which a Denuvo game refuses. The result (not the ticket) is noted in `files/windows.log`.
+which a Denuvo game refuses. The result (not the ticket) is noted in the run's log.
 
 **Graphics.** The games' Windows is set at every start: on an Adreno GPU (Snapdragon: the Fold's) the Turnip driver with Gladio, and DXVK naming a
 desktop card (an AMD Radeon RX 6800 XT, the same at every start), as the Blizzard launcher does; elsewhere Winlator's default, Vortek. Winlator extracts
 a changed driver or DXVK by itself.
 
-**Logs.** Each start writes `files/windows-session.log` (the one before kept as `.1`): Wine's `err,seh,loaddll` channels (patch 0007) and the session's
-own events (patch 0008), beside the app's notes (`files/windows.log`) and any crash of the app (`files/crash.log`, `PersonaApp`). Box64's own log is
-off (it repeats its settings for every program). When there are logs, the game's screen shows **SHARE LOG**: a short digest as text that pastes whole
-(`LogDigest`: Box64's settings, Windows' own libraries and Wine's exception registers left out, Wine's own RPC_S_SERVER_UNAVAILABLE at start
-once, repeats counted, the end kept), how Android says the app's last runs ended
-(ApplicationExitInfo: a native crash with its tombstone's readable words, the system ending it, memory), and the full logs as a file beside it.
+**Logs.** Wine's `err,seh,loaddll` channels go to the run's log through `GameLog` (Reports and logs, below) and, whole, to
+`files/windows-session.log` (the one before kept as `.1`; patches 0007 and 0008). Box64's own log is off (it repeats its settings for every program).
 
-Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`), the log digest (`LogDigestTest`). The
+Tested here: the build (Winlator's Java and native code in the app), the program finder, the emulator swap and its settings (`WindowsGamesTest`), the loader's
+settings (`ColdClientTest`), the reports (`BugReportsTest`, `SessionLogTest`, `DiagnosticsTest`, `GameLogTest`). The
 ticket request has not been run against the service (it needs a signed-in account that owns the game). Not run on a phone:
 whether Persona 4 Golden starts and plays under Winlator on the Fold has not been seen.
 
-## Reports: crashes sent as issues
+## Reports and logs
 
-The app's failures go to this repository as GitHub issues by themselves (labels `bug`, `auto-report`), as the Blizzard launcher's do (`reports/Reports`,
-`backend/reports/Issues`):
+The Blizzard launcher's reports, ported whole (`reports/BugReports`, `SessionLog`, `Diagnostics`, `LogFilter`, `game/GameLog`, `game/GameSession`):
 
-- **A pop-up** on the launcher, as the Blizzard launcher shows a failed start: what happened ("Persona 4 Golden closed while starting (3 seconds after
-  PLAY)") and what became of the report ("A report with its log was sent (issue #2)", or why not yet), with OK and SHARE LOG.
-- **A Windows game's session that ends by itself**: Winlator's game screen closes, its program ended (patch 0008) without the player's Exit (patch
-  0009), within five minutes of PLAY or with a failing status. The issue holds SHARE LOG's short report (notes, how Android says the app ended, the
-  session log's digest) and, as comments, the end of the session's whole log. The game's screen says "It closed while starting" and that a report goes.
-- **The app crashing**: a Java crash (its stack, written as the process ends, sent at the next start); a native crash, an ANR, Android ending the app
-  (ApplicationExitInfo, read at the next start: a native crash's tombstone as its readable words), with the Windows logs when a game's session ran
-  just before.
-- **PLAY failing** before the game's screen (the runtime, the games' Windows, the game's program): its stack.
+- **The run's log** (`files/logs-app/run-<start>.log`, UTC to the millisecond, a kind on each line): what the app decided (`app`, `windows`), Wine's and
+  Box64's lines without the noise (`wine`: a repeated line said three times then counted; a longjmp's or a thread-naming exception's trace dropped),
+  the libraries loaded (`lib`), the session keeper's log (`keeper`), memory, processes, heat and battery every few seconds while a game runs (`res`),
+  how the last run ended (`exit`), what became of each report (`report`). Written line by line; the last six runs kept.
+- **A game's session** (`GameSession`, made by Winlator's game screen with the extra `game_id`, patch 0010): no game window in 90 seconds is a report; a
+  minute into the game its log goes once a day; a game that ends by itself (Wine's program ended without the player's Exit) within five minutes or with a
+  failing status is a report, and the launcher's pop-up says so with the issue it became. Each carries the game's log (the libraries loaded, Wine's
+  lines, the keeper's log: each program's start and end with its exit code, the game's windows, a dialog box's words, why the session ended; the app's
+  notes), the phone's state, and as comments the run's log and Android's log of the app.
+- **The app crashing**: a Java crash is written as a report as the process ends and sent at the next start, with the run's log; a native crash, an ANR,
+  Android ending the app for memory (ApplicationExitInfo) are reported at the next start with the log of the run that ended.
+- **PLAY failing** before the game's screen, and an update's download failing: a report with the stack.
+- **Send the log**: in a game's menu (More) and in Settings' Reports; a toast says the issue it became.
 
-Each is written to `files/reports` first and sent at once, then every minute while any wait (offline, GitHub busy), kept until GitHub takes it; a
-step that failed goes on from where it stopped (the issue is opened once). The same failure of the same build goes once a day; a new build reports
-again. A report never names the account (its name is replaced by `<account>`) or the store (its name reads "store": the emulator's libraries appear
-as `store_api64.dll`); SHARE LOG's text and file are the same.
+Each report is written to `files/reports` first and sent at once, then every minute while any wait, kept until GitHub takes it; a long log goes as
+several comments, the issue opened once. The same failure goes once a day per build (a new build reports again). A report never names the account
+(`<account>`) or the store (its name reads "store": the emulator's libraries appear as `store_api64.dll`), and never carries a key or a token.
 
 The token is built in from CI's **`PERSONA_REPORT_TOKEN`** secret (a fine-grained token with Issues: read and write on this repository only), as
-the Blizzard launcher carries `BLIZZ_REPORT_TOKEN`. A build without it keeps its reports on the phone and sends nothing; SHARE LOG still works.
-After the secret is added or changed, a new build carries it: a push, or **Run workflow** on the Actions tab (`workflow_dispatch`, released the same way).
+the Blizzard launcher carries `BLIZZ_REPORT_TOKEN`. A build without it keeps its reports on the phone and sends nothing. After the secret is added or
+changed, a new build carries it: a push, or **Run workflow** on the Actions tab (`workflow_dispatch`, released the same way).

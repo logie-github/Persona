@@ -37,6 +37,14 @@ jobs:
           command -v 7z > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full > /dev/null; }
           scripts/prepare-steamemu.sh
       # Release build, signed with the app's own key so each release installs over the last.
+      # The session's keeper (borderless.exe, the Blizzard launcher's: tools/borderless), built with Zig (kept in a cache by its pin).
+      - name: Zig for the keeper
+        uses: actions/cache@v4
+        with:
+          path: build/keeper
+          key: persona-zig-${{ hashFiles('keeper.env') }}
+      - name: Session keeper
+        run: sh scripts/build-keeper.sh
       - name: Build and test
         env:
           # The reports' token (Issues: read and write on this repository), built into the app as the Blizzard launcher's is.

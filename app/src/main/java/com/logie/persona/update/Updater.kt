@@ -57,13 +57,17 @@ object Updater {
         scope.launch {
             runCatching { clearInstalledUpdate(app) }
             // Offline or GitHub unreachable: carry on, and look again next time.
-            val update = runCatching { findUpdate() }.getOrNull() ?: return@launch
+            val update = runCatching { findUpdate(app) }.getOrNull() ?: return@launch
             try {
                 _state.value = State.Downloading(update, 0, update.size)
                 val apk = download(app, update) { done, total -> _state.value = State.Downloading(update, done, total) }
                 ready(app, update, apk)
             } catch (e: Exception) {
                 _state.value = State.Failed("The update couldn't be downloaded (${e.message}). What arrived is kept: it carries on next time.")
+                com.logie.persona.reports.BugReports.report(
+                    app, "App update download", e.message ?: e.javaClass.simpleName,
+                    listOf("Update" to update.title, "Size" to update.size.toString()), log = e.stackTraceToString(),
+                )
             }
         }
     }
@@ -111,9 +115,10 @@ object Updater {
             try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
         }
 
-    /** The newest release if it's newer than this build, otherwise null. */
-    fun findUpdate(): Update? {
+    /** The newest release if it's newer than this build, otherwise null. With [context], the releases' patch notes are kept ([PatchNotes]). */
+    fun findUpdate(context: Context? = null): Update? {
         val body = releasesJson()
+        context?.let { runCatching { PatchNotes.keep(it, body) } }
         val update = UpdatePicker.pick(parse(body), BuildConfig.RELEASE_TAG_PREFIX, BuildConfig.VERSION_CODE) ?: return null
         return Update(update.versionCode, update.title, update.apk.name, update.apk.url, update.apk.size)
     }

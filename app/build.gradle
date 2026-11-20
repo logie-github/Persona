@@ -83,8 +83,10 @@ android {
 		resources { excludes += ['META-INF/{AL2.0,LGPL2.1}', 'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/io.netty.versions.properties', 'META-INF/*.kotlin_module'] }
 	}
 
-	// The skins (skins/<name>: the page, its art and fonts) are part of the app's assets, under their own folder names.
-	sourceSets.main.assets.srcDirs += ['../skins', 'winlator/assets', 'steamemu/assets']
+	// Winlator's runtime, the Steam emulator's files (scripts/prepare-steamemu.sh) and the session's keeper (borderless.exe,
+	// scripts/build-keeper.sh) are part of the app's assets. (The Persona 1 skin, skins/violet, is no longer in the app: every game has its
+	// Persona look in the launcher.)
+	sourceSets.main.assets.srcDirs += ['winlator/assets', 'steamemu/assets', 'keeper/assets']
 	sourceSets.main.java.srcDirs += ['winlator/java']
 	sourceSets.main.res.srcDirs += ['winlator/res']
 	sourceSets.main.jniLibs.srcDirs += ['winlator/jniLibs']
@@ -112,8 +114,6 @@ dependencies {
 	implementation 'androidx.appcompat:appcompat:1.7.1'
 	// Draws the sign-in approval link as a QR code.
 	implementation 'com.google.zxing:core:3.5.3'
-	// Serves the skins (web pages in the app's assets) to the WebView from an address that exists only inside the app.
-	implementation 'androidx.webkit:webkit:1.12.1'
 	// Winlator's.
 	implementation 'com.google.android.material:material:1.11.0'
 	implementation 'org.apache.commons:commons-compress:1.27.1'
