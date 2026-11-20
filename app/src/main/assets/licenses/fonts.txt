@@ -1,0 +1,163 @@
+Fonts in the Persona app (app/src/main/res/font), stand-ins for the games' own fonts:
+
+persona_adventor_bold.otf: TeX Gyre Adventor Bold (an ITC Avant Garde Gothic clone), GUST Font License (below).
+persona_rounded_extrabold.ttf, persona_rounded_black.ttf: Rounded M+ 1c ExtraBold and Black, cut to Latin; SIL Open Font License 1.1 (below).
+persona_anton.ttf, persona_archivo_black.ttf, persona_abril_fatface.ttf, persona_bowlby_one.ttf, persona_rubik_mono_one.ttf, persona_bebas_neue.ttf: SIL Open Font License 1.1 (below); their copyright lines are in each font.
+persona_bmspace.ttf: BM space by BitmapMania / cooz, freeware for personal, non-commercial use (its read-me, below).
+
+==== SIL Open Font License 1.1 ====
+Copyright (c) <dates>, <Copyright Holder> (<URL|email>),
+with Reserved Font Name <Reserved Font Name>.
+Copyright (c) <dates>, <additional Copyright Holder> (<URL|email>),
+with Reserved Font Name <additional Reserved Font Name>.
+Copyright (c) <dates>, <additional Copyright Holder> (<URL|email>).
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://openfontlicense.org
+
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+==== GUST Font License ====
+% This is a preliminary version (2006-09-30), barring acceptance from
+% the LaTeX Project Team and other feedback, of the GUST Font License.
+% (GUST is the Polish TeX Users Group, http://www.gust.org.pl)
+%
+% For the most recent version of this license see
+% http://www.gust.org.pl/fonts/licenses/GUST-FONT-LICENSE.txt
+% or
+% http://tug.org/fonts/licenses/GUST-FONT-LICENSE.txt
+%
+% This work may be distributed and/or modified under the conditions
+% of the LaTeX Project Public License, either version 1.3c of this
+% license or (at your option) any later version.
+% 
+% Please also observe the following clause:
+% 1) it is requested, but not legally required, that derived works be
+%    distributed only after changing the names of the fonts comprising this
+%    work and given in an accompanying "manifest", and that the
+%    files comprising the Work, as listed in the manifest, also be given
+%    new names. Any exceptions to this request are also given in the
+%    manifest.
+%    
+%    We recommend the manifest be given in a separate file named
+%    MANIFEST-<fontid>.txt, where <fontid> is some unique identification
+%    of the font family. If a separate "readme" file accompanies the Work, 
+%    we recommend a name of the form README-<fontid>.txt.
+%
+% The latest version of the LaTeX Project Public License is in
+% http://www.latex-project.org/lppl.txt and version 1.3c or later
+% is part of all distributions of LaTeX version 2006/05/20 or later.
+
+
+==== BM space: read me (BitmapMania) ====
+BitmapMania Font
+---------------------------
+<<< ちょっと使用上の注意 >>>
+
+当サイトのフォントは全てビットマップフォントです。
+各フォント名の数字は指定ピクセル数を表しています。
+（Macintoshの方はポイントとピクセルが一致するため問題ありませんが、
+Windowsの方はピクセル指定出来るソフトで、ピクセル指定してご利用下さい。）
+また、拡大する場合はピクセル数の倍数で拡大して下さい。
+ただし、ビットマップフォントではありますがアウトラインデータも持っていますので、
+イラストレータなどのドロー系ソフトではどんなポイント数でも綺麗に印刷する事は可能です。
+ビットマップフォントを印刷目的にする方はあまりいないとは思いますが・・・
+
+<<< 著作権など >>>
+
+当サイトのフォント、及び画像はフリーウエアですが、著作権を放棄したものではありません。
+HP等に個人で使用する事は構いませんが、作者の許可なく販売したり、
+営利目的の製品に添付する事は固く禁じさせて頂きます。
+また、フォントを使用してのいかなる損害についても作者は責任を負わないものとします。
+---------------------------------------------------------- 
+
+copyright(c)BitmapMania/cooz SINCE 2001 All right reserved.
+http://www.ylw.mmtr.or.jp/‾cooz-mk/bitmapmania/
+cooz-mk@ylw.mmtr.or.jp

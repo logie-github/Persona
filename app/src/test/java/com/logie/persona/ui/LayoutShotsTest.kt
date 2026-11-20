@@ -31,11 +31,22 @@ class LayoutShotsTest {
     @Test fun theLibraryAndEachGamesOwnScreen() {
         compose.mainClock.autoAdvance = false                      // (a progress spinner never lets the clock be idle)
         compose.setContent { Launcher() }
-        compose.mainClock.advanceTimeBy(500)
+        repeat(8) { compose.mainClock.advanceTimeBy(250) }        // (the menu's entrance takes 0.9 s)
         save("wide-p1")
         compose.onNodeWithText("Persona 2").performClick(); repeat(4) { compose.mainClock.advanceTimeBy(250) }      // (the first click of a test isn't drawn until the next)
         for (n in listOf(5, 4, 3, 2)) {
-            compose.onNodeWithText("Persona $n").performClick(); repeat(4) { compose.mainClock.advanceTimeBy(250) }; save("wide-p$n")
+            compose.onNodeWithText("Persona $n").performClick(); repeat(8) { compose.mainClock.advanceTimeBy(250) }; save("wide-p$n")
+        }
+    }
+
+    /** The cover screen: the game's menu over a row of boxes. */
+    @Config(qualifiers = "w411dp-h860dp-port-xhdpi")
+    @Test fun theCoverScreen() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { Launcher() }
+        repeat(8) { compose.mainClock.advanceTimeBy(250) }
+        for (n in listOf(5, 3)) {
+            compose.onNodeWithText("PERSONA $n").performClick(); repeat(8) { compose.mainClock.advanceTimeBy(250) }; save("narrow-p$n")
         }
     }
 }

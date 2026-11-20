@@ -93,9 +93,30 @@ to `ui/Launcher.kt`, `ui/Dialogs.kt` and `ui/Look.kt`), in each game's Persona c
 - **The home.** On the open Fold (600 dp and more) every game is in a list on the left (its box art or numbered box, its name, its versions, a green
   dot when one is installed, the accent's while one installs) and the chosen game's own screen on the right; on the cover screen the game's screen with a
   row of boxes under it (the chosen one raised). The game chosen, and each game's version, are kept between starts.
-- **A game's screen** is its Persona look (what Persona 2 to 5 had; Persona 1 now has it too, in its violet): the game's colours, its number huge and faint
-  behind, "PERSONA N" large and slanted, its subtitle, its versions as slanted chips, and its menu words (`MenuSpec`: PLAY, INSTALL or UNINSTALL, VERSION,
-  MODS, OPTIONS) with the chosen one on a band: tap a word to choose it, tap it again to do it. Persona 2 crimson, 3 blue, 4 yellow, 5 red and black.
+- **A game's screen** is its own menu (below): its menu words (`MenuSpec`: PLAY, INSTALL or UNINSTALL, VERSION, MODS, OPTIONS), tap a word to choose it,
+  tap it again to do it.
+- **The games' menus** (`ui/PersonaMenu.kt`), after the user's reference (Persona 5's pause menu over Persona 3): the game's colours with a moving
+  background of its own, a slanted panel on the right with the game's character in front of it (breathing), the menu's words stacked and zig-zagging on
+  the left in the game's lettering (sized to fit the screen's height), the chosen one lit and moving, the title and versions above, and a line of the
+  game's kind at the bottom; everything comes in on a staggered entrance when a game is chosen.
+  - Persona 1: violet night, the moon with a glow and a ring of runes turning, squares drifting up, stars; the chosen word on a white band. The moon's
+    phase at the bottom (counted in eighths, as Persona 1 and 2 do, from a known new moon).
+  - Persona 2: crimson, a jagged sigil turning, slashes of light, ash falling; a black panel with embers; the chosen word on gold; the moon's phase.
+  - Persona 3: deep water with light moving through it and bubbles; a white panel with a clock's rings turning, its hands moving and cracks across it;
+    slanted rounded lettering, the chosen word on a cyan band with a sweep of light; the date, the day and the time of day (the Dark Hour at midnight).
+  - Persona 4: yellow, fog drifting, hazard stripes running; a black TV panel with static, scan lines and a rolling band; the chosen word in a black box
+    that jitters like a bad signal; the date and the time of day.
+  - Persona 5: red, a sunburst turning, halftone dots; a black panel with stars; every word a ransom note (each letter its own face, box and tilt, fixed
+    by the word), the chosen one red and white and shaking; the date in the same letters.
+- **Lettering.** The fonts the user named (gamefontlibrary.com's pages for Final Fantasy XV, Persona 3 Reload, Persona 4 Golden and Persona 5) are
+  commercial (ITC Avant Garde Gothic, Condensed Runic MT, SKIP Std B, New Rodin Pro, FOT-Rodin Pro, an AsiaFont face) apart from BM Space (Persona 3 Reload's,
+  BitmapMania's freeware). The app carries free stand-ins (`res/font`, licences in `assets/licenses/fonts.txt`): TeX Gyre Adventor (an Avant Garde
+  clone, GUST licence) for Persona 1 and 2; Rounded M+ 1c ExtraBold and Black (OFL, cut to Latin) for SKIP Std B in Persona 3 and 4; BM Space for Persona
+  3's date; Anton, Archivo Black, Abril Fatface, Bowlby One, Rubik Mono One and Bebas Neue (OFL) mixed for Persona 5's ransom notes. A font file the
+  person has (the game's own) is set per game in Settings, Games: **Font** (checked by the phone's font loader, kept in `files/fonts/pN.ttf`), and used
+  in place of the stand-in (in Persona 5's ransom notes beside the others).
+- **Characters.** Settings, Games: **Character** sets a game's picture (best with a transparent background; kept as `files/art/character-pN.png`); else the
+  app's own (`assets/characters/pN.png`: Persona 2's is the picture the user sent, 20 November 2026); else a stand-in figure in the game's colours.
 - **The accent** (buttons, switches, the list's marks) follows the chosen game's colours (`PersonaColors`); Persona 4's yellow carries black type.
 - **More** (or holding a game's row or box) opens its menu: Options, Mods (Persona 1), Box art, Send the log, Uninstall (asks first; saves stay).
 - **The gear** opens Settings: **Launcher** (the account signed in, the SteamGridDB key for Box art, Reports: what became of each report and Send the log

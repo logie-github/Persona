@@ -104,7 +104,7 @@ fun Launcher() {
                     onVersion = { val i = game.versions.indexOf(version); chooseVersion(game, game.versions[(i + 1) % game.versions.size]) },
                     onSteamInstall = { if (InstallCenter.isSignedIn(context)) InstallService.start(context, version.id) else signIn = version })
                 Box(modifier) {
-                    GameScreen(game, version, state, onVersion = { chooseVersion(game, it) })
+                    PersonaMenu(game, version, state, onVersion = { chooseVersion(game, it) })
                     TopBar(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 10.dp, end = 14.dp), onMore = { holdFor = game }, onSettings = { settingsOpen = true })
                 }
                 if (state.options) OptionsDialog(version, state.closeOptions)
@@ -281,50 +281,6 @@ internal class PersonaColors(val top: Color, val bottom: Color, val ink: Color, 
             3 -> PersonaColors(Color(0xFF1F63B8), Color(0xFF041226), Color(0xFFEAF6FF), Color(0xFF3D9BFF), Color(0xFFEAF6FF), Color(0xFF0B2E5C), listOf(Color(0xFF1F63B8), Color(0xFF07182E)))
             4 -> PersonaColors(Color(0xFFF6C623), Color(0xFFE09A12), Color(0xFF16120A), Color(0xFFF6C623), Color(0xFF16120A), Color(0xFFF6C623), listOf(Color(0xFFE8B923), Color(0xFF3A2C05)), onAccent = Color(0xFF16120A))
             else -> PersonaColors(Color(0xFFD7102C), Color(0xFF1A0206), Color.White, Color(0xFFE5112F), Color.Black, Color.White, listOf(Color(0xFFD7102C), Color(0xFF1A0206)))
-        }
-    }
-}
-
-/**
- * A game's screen in its own Persona look (what Persona 2 to 5 had, now every game's, Persona 1 in its violet): its colours, its number
- * huge and faint, its name large and slanted, its versions, and its menu words with the chosen one on a band; what is happening under them.
- */
-@Composable
-private fun GameScreen(game: Game, version: Version, state: GameState, onVersion: (Version) -> Unit) {
-    val t = PersonaColors.of(game.number)
-    var chosen by rememberSaveable(game.id) { mutableStateOf<String?>(null) }
-    val index = state.rows.indexOfFirst { it.label == chosen }.takeIf { it >= 0 } ?: state.rows.indexOfFirst { it.usable }.coerceAtLeast(0)
-    Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(t.top, t.bottom)))) {
-        Text(game.number.toString(), fontSize = 420.sp, fontWeight = FontWeight.Black, color = t.ink.copy(alpha = 0.07f),
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).graphicsLayer { rotationZ = -8f })
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 28.dp, vertical = 20.dp).verticalScroll(rememberScrollState())) {
-            Text("PERSONA ${game.number}", fontSize = 54.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = t.ink,
-                modifier = Modifier.padding(end = 110.dp).graphicsLayer { rotationZ = -4f; transformOrigin = TransformOrigin(0f, 0.5f) })
-            Text(game.title.removePrefix("Persona ${game.number}").removePrefix(":").trim().ifEmpty { version.label }.uppercase(), fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                letterSpacing = 4.sp, color = t.accent.takeIf { game.number != 4 } ?: t.ink, modifier = Modifier.padding(start = 6.dp))
-            if (game.versions.size > 1) Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                game.versions.forEach { v ->
-                    val on = v == version
-                    Text(v.label.uppercase(), fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, color = if (on) t.bandInk else t.ink,
-                        modifier = Modifier.graphicsLayer { rotationZ = -4f }.clip(RoundedCornerShape(4.dp)).background(if (on) t.band else t.ink.copy(alpha = 0.10f))
-                            .clickable { onVersion(v) }.padding(horizontal = 14.dp, vertical = 8.dp))
-                }
-            }
-            Spacer(Modifier.height(36.dp))
-            state.rows.forEachIndexed { i, r ->
-                val on = i == index
-                Text(r.label, fontSize = 40.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp,
-                    color = when { on -> t.bandInk; r.usable -> t.ink; else -> t.ink.copy(alpha = 0.35f) },
-                    modifier = Modifier.padding(vertical = 2.dp).graphicsLayer { rotationZ = -5f; transformOrigin = TransformOrigin(0f, 0.5f) }
-                        .background(if (on) t.band else Color.Transparent).clickable { if (on) { if (r.usable) state.perform(r.id) } else chosen = r.label }
-                        .padding(horizontal = 14.dp))
-            }
-            state.gauge?.let { g ->
-                Text(g.text, color = t.ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                LinearProgressIndicator(progress = { g.fraction }, color = if (game.number == 4) t.ink else t.accent, trackColor = t.ink.copy(alpha = 0.15f), modifier = Modifier.fillMaxWidth(0.6f).padding(top = 6.dp))
-            }
-            state.notice?.let { Text(it, color = t.ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp)) }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }

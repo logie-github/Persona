@@ -276,6 +276,7 @@ private fun GamesPage(versionOf: (Game) -> Version, artRevision: Int, onArt: (Ga
     PatchNotesCard()
     for (game in Catalog.all) {
         SettingCard(game.title) {
+            MenuLookRow(game)
             for (v in game.versions) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     BoxPicture(game, v, artRevision, Modifier.width(46.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)))
@@ -367,4 +368,33 @@ internal fun UpdateBanner() {
             }
         }
     }
+}
+
+/**
+ * A game's menu: its character (a person picture, best with a transparent background: [characterFile]) and its lettering (a font file the
+ * person has, such as the game's own: [customFontFile]); each put back with Reset.
+ */
+@Composable
+private fun MenuLookRow(game: Game) {
+    val context = LocalContext.current
+    val revision by MenuAssets.revision.collectAsState()
+    var message by remember { mutableStateOf<String?>(null) }
+    val pickCharacter = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) message = if (MenuFiles.setCharacter(context, game.number, uri)) null else "That picture couldn't be read."
+    }
+    val pickFont = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) message = if (MenuFiles.setFont(context, game.number, uri)) null else "That isn't a font file (.ttf or .otf) the phone can read."
+    }
+    val character = remember(revision) { characterFile(context, game.number) != null }
+    val font = remember(revision) { customFontFile(context, game.number) != null }
+    Text(
+        listOfNotNull(if (character) "your character" else null, if (font) "your font" else null).let { if (it.isEmpty()) "The menu's own character and lettering" else "The menu has ${it.joinToString(" and ")}" },
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FrameButton("Character", primary = false) { pickCharacter.launch(arrayOf("image/*")) }
+        FrameButton("Font", primary = false) { pickFont.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream", "*/*")) }
+        if (character || font) FrameButton("Reset", primary = false) { MenuFiles.reset(context, game.number) }
+    }
+    message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Modern.Gold) }
 }
