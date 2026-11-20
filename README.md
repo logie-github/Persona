@@ -295,7 +295,7 @@ The Blizzard launcher's reports, ported whole (`reports/BugReports`, `SessionLog
   goes into the run's log (`relay`) and the report with the library its return address is in ("Call KERNEL32.ExitProcess(00000003) ret=140001050 (in
   exitprobe.exe)", as the desktop rig printed it for a stand-in program); the channel's other lines (every window message, each library's start and
   end) are dropped. Wine traces those window messages whatever the list says, which slows a game: the trace is off again once a run lasts a minute or
-  the player chooses Exit.
+  the player chooses Exit. Persona 4 Golden's runs are traced from the first (its reports showed it closing by itself already).
 - **The app crashing**: a Java crash is written as a report as the process ends and sent at the next start, with the run's log; a native crash, an ANR,
   Android ending the app for memory (ApplicationExitInfo) are reported at the next start with the log of the run that ended.
 - **PLAY failing** before the game's screen, and an update's download failing: a report with the stack.

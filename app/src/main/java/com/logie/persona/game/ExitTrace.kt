@@ -28,12 +28,15 @@ object ExitTrace {
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("exit-trace", Context.MODE_PRIVATE)
 
+    /** The games whose runs closed by themselves in the reports when this was made (issues #2 to #7): traced from their first run. */
+    val KNOWN = setOf("persona4_golden")
+
     /** Whether the game [versionId]'s next run is traced (its last run closed by itself). */
-    fun armed(context: Context, versionId: String): Boolean = prefs(context).getBoolean(versionId, false)
+    fun armed(context: Context, versionId: String): Boolean = prefs(context).getBoolean(versionId, versionId in KNOWN)
 
     fun arm(context: Context, versionId: String) { prefs(context).edit().putBoolean(versionId, true).apply() }
 
-    fun disarm(context: Context, versionId: String) { if (armed(context, versionId)) prefs(context).edit().remove(versionId).apply() }
+    fun disarm(context: Context, versionId: String) { if (armed(context, versionId)) prefs(context).edit().putBoolean(versionId, false).apply() }
 
     /** The list Wine reads when its relay channel is on (`HKCU\Software\Wine\Debug\RelayInclude`); written at every traced start. */
     fun apply(containerRoot: File) {
