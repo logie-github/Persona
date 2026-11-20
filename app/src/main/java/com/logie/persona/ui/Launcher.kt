@@ -253,15 +253,15 @@ private fun Shelf(selected: Game, versionOf: (Game) -> Version, artRevision: Int
         itemsIndexed(Catalog.all, key = { _, g -> g.id }) { _, game ->
             val on = game.id == selected.id
             val lift by animateFloatAsState(if (on) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "lift")
-            Column(Modifier.width(84.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // The box and its name under it both choose the game (held: its menu).
+            Column(Modifier.width(84.dp).combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null,
+                onClick = { onSelect(game) },
+                onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); openHold(game) }), horizontalAlignment = Alignment.CenterHorizontally) {
                 BoxPicture(game, versionOf(game), artRevision, Modifier.fillMaxWidth().aspectRatio(2f / 3f)
                     .graphicsLayer { translationY = -6.dp.toPx() * lift; val s = 1f + 0.04f * lift; scaleX = s; scaleY = s }
                     .shadow((4 + 10 * lift).dp, RoundedCornerShape(12.dp))
                     .clip(RoundedCornerShape(12.dp))
-                    .border(if (on) 2.dp else 1.dp, if (on) PersonaColors.of(game.number).accent else Modern.Outline, RoundedCornerShape(12.dp))
-                    .combinedClickable(interactionSource = remember { MutableInteractionSource() }, indication = null,
-                        onClick = { onSelect(game) },
-                        onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); openHold(game) }),
+                    .border(if (on) 2.dp else 1.dp, if (on) PersonaColors.of(game.number).accent else Modern.Outline, RoundedCornerShape(12.dp)),
                     numberSize = 40)
                 Spacer(Modifier.height(6.dp))
                 Text("PERSONA ${game.number}", style = MaterialTheme.typography.bodySmall.copy(color = if (on) Modern.Text else Modern.Muted, fontWeight = FontWeight.Bold), maxLines = 1)

@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -67,9 +68,11 @@ import kotlin.math.sin
  * - Persona 1: violet; the moon with its ring of runes and squares drifting up. Avant Garde lettering (the Final Fantasy XV page's main
  *   font: TeX Gyre Adventor, its free clone), the chosen word on a white band.
  * - Persona 2: crimson and black; a jagged sigil turning, ash falling, light slashing across. The same lettering, the chosen word on gold.
- * - Persona 3: deep blue water with light moving through it and bubbles; a white panel with a clock's rings turning and cracks across it.
- *   Rounded heavy lettering, slanted (SKIP Std B's stand-in: Rounded M+), the chosen word on a cyan band with a sweep of light; BM Space
- *   (the Persona 3 Reload page's) for the date.
+ * - Persona 3 (Reload's blue): under water at night, light falling in shafts from the surface, bubbles and specks rising, the big moon behind
+ *   the character with the month's eight phases turning around it (tonight's lit); a glass panel with a glowing edge and a glint crossing it.
+ *   Rounded heavy lettering, slanted (SKIP Std B's stand-in: Rounded M+), the words stepping down to the right; the chosen word on a white-to-cyan
+ *   band with its echo rippling out and a pointer; the character cut out in white with a cyan glow. BM Space (the Persona 3 Reload page's) for
+ *   the moon, the date, the day and the time of day.
  * - Persona 4: yellow; a black TV panel with static and scan lines, fog drifting, hazard stripes. Rounded black lettering, the chosen word
  *   in a black box that jitters like a bad signal.
  * - Persona 5: red; a sunburst turning, halftone dots, a black panel with stars. Every word a ransom note (each letter its own font, box and
@@ -101,7 +104,7 @@ internal fun PersonaMenu(game: Game, version: Version, state: GameState, onVersi
         Canvas(Modifier.fillMaxSize().graphicsLayer { translationX = (1f - enter.value) * size.width * 0.35f }) {
             val panel = panelPath(size, wide)
             clipPath(panel) { style.panel(this, time) }
-            drawPath(panel, style.panelEdge, style = Stroke(width = 6.dp.toPx()))
+            style.edge(this, panel)
         }
         // The character, in front of the panel, breathing.
         Portrait(
@@ -122,16 +125,19 @@ internal fun PersonaMenu(game: Game, version: Version, state: GameState, onVersi
         Column(
             Modifier.fillMaxHeight().fillMaxWidth(if (wide) 0.62f else 1f).statusBarsPadding().padding(start = 26.dp, top = 18.dp, end = 12.dp, bottom = 18.dp),
         ) {
-            Box(Modifier.padding(end = if (wide) 0.dp else 104.dp)) { Title(game, version, style, fonts, time, enter.value) }
+            // The title on one line: smaller where the screen is narrow (the buttons at the top right take some of it).
+            val titleScale = (((if (wide) w * 0.62f else w) - 142.dp) / 330.dp).coerceIn(0.6f, 1f)
+            Box(Modifier.padding(end = if (wide) 0.dp else 104.dp)) { Title(game, version, style, fonts, time, enter.value, titleScale) }
             if (game.versions.size > 1) Versions(game, version, style, fonts, onVersion)
             Spacer(Modifier.height(if (wide) 30.dp else 22.dp))
             state.rows.forEachIndexed { i, row ->
                 val appear = ((enter.value - 0.12f * i / state.rows.size.coerceAtLeast(1)) / 0.7f).coerceIn(0f, 1f)
                 // The zig-zag of the reference: each word a little to the right of the last, then back.
-                val zig = listOf(0f, 0.6f, 1f, 0.45f, 0.85f, 0.2f)[i % 6]
+                // Persona 3's step down to the right, as its menus run.
+                val zig = if (style.number == 3) i * (if (wide) 0.8f else 0.45f) else listOf(0f, 0.6f, 1f, 0.45f, 0.85f, 0.2f)[i % 6]
                 MenuWord(
                     row, i == index, style, fonts, time, i, scale,
-                    Modifier.padding(start = (zig * 34f).dp, top = (if (style.number == 5) 4f else 9f).dp * scale, bottom = (if (style.number == 5) 4f else 9f).dp * scale)
+                    Modifier.padding(start = (zig * 34f).dp * (if (style.number == 3) scale else 1f), top = (if (style.number == 5) 4f else 9f).dp * scale, bottom = (if (style.number == 5) 4f else 9f).dp * scale)
                         .graphicsLayer { alpha = appear; translationX = (1f - appear) * -220.dp.toPx() },
                 ) { if (i == index) { if (row.usable) state.perform(row.id) } else chosen = row.label }
             }
@@ -222,13 +228,21 @@ internal object MenuAssets {
 // The title and the versions
 
 @Composable
-private fun Title(game: Game, version: Version, style: MenuStyle, fonts: MenuFonts, time: Float, enter: Float) {
+private fun Title(game: Game, version: Version, style: MenuStyle, fonts: MenuFonts, time: Float, enter: Float, scale: Float) {
     val subtitle = game.title.removePrefix("Persona ${game.number}").removePrefix(":").trim().ifEmpty { if (game.versions.size > 1) "" else version.label }
     Column(Modifier.padding(top = 14.dp).graphicsLayer { alpha = enter; translationY = (1f - enter) * -40.dp.toPx() }) {
         if (style.number == 5) {
             RansomText("PERSONA 5", fonts, 0, false, time, height = 58.dp)
+        } else if (style.number == 3) {
+            Text("PERSONA 3", maxLines = 1, softWrap = false, style = fonts.title.copy(fontSize = fonts.title.fontSize * scale, color = style.ink, shadow = Shadow(style.shadow, Offset(5f, 5f), 0f)))
+            // A line of light under it, running out to the right.
+            Canvas(Modifier.fillMaxWidth(0.8f).height(4.dp)) {
+                drawRect(Brush.horizontalGradient(listOf(style.accentInk, style.accentInk.copy(alpha = 0f))))
+                val x = ((time * 0.35f) % 1f) * size.width
+                drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White, Color.Transparent), x - 40f, x + 40f))
+            }
         } else {
-            Text("PERSONA ${game.number}", style = fonts.title.copy(color = style.ink, shadow = Shadow(style.shadow, Offset(4f, 4f), 0f)),
+            Text("PERSONA ${game.number}", maxLines = 1, softWrap = false, style = fonts.title.copy(fontSize = fonts.title.fontSize * scale, color = style.ink, shadow = Shadow(style.shadow, Offset(4f, 4f), 0f)),
                 modifier = Modifier.graphicsLayer { rotationZ = -4f; transformOrigin = TransformOrigin(0f, 0.5f) })
         }
         if (subtitle.isNotEmpty()) Text(subtitle.uppercase(), style = fonts.small.copy(color = style.accentInk, fontSize = 17.sp, letterSpacing = 4.sp),
@@ -262,7 +276,8 @@ private fun MenuWord(row: MenuRow, on: Boolean, style: MenuStyle, fonts: MenuFon
     val dim = if (row.usable) 1f else 0.38f
     // The chosen word leans out a little further and sways.
     val sway = if (on) sin(time * 3.2f) * 1.2f else 0f
-    val tilt = (if (index % 2 == 0) -5f else -2.5f) + sway
+    // Persona 3's words keep level (the lettering leans by itself), the chosen one drifting like something in water.
+    val tilt = if (style.number == 3) (if (on) sin(time * 1.6f) * 0.6f else 0f) else (if (index % 2 == 0) -5f else -2.5f) + sway
     Box(
         modifier
             .graphicsLayer { rotationZ = tilt; val s = 1f + 0.08f * lit; scaleX = s; scaleY = s; transformOrigin = TransformOrigin(0f, 0.5f); translationX = 14.dp.toPx() * lit }
@@ -274,7 +289,7 @@ private fun MenuWord(row: MenuRow, on: Boolean, style: MenuStyle, fonts: MenuFon
             val jitter = if (on && style.number == 4) (if (floor(time * 9f).toInt() % 7 == 0) 3.dp else 0.dp) else 0.dp
             Text(
                 row.label,
-                style = fonts.words.copy(fontSize = fonts.words.fontSize * scale, color = (if (on) style.bandInk else style.ink).copy(alpha = dim), shadow = if (on) null else Shadow(style.shadow.copy(alpha = 0.6f * dim), Offset(3f, 3f), 0f)),
+                style = fonts.words.copy(fontSize = fonts.words.fontSize * scale, color = (if (on) style.bandInk else style.ink).copy(alpha = dim), shadow = if (on) null else if (style.number == 3) Shadow(style.shadow.copy(alpha = 0.9f * dim), Offset(5f, 5f), 0f) else Shadow(style.shadow.copy(alpha = 0.6f * dim), Offset(3f, 3f), 0f)),
                 modifier = Modifier.offset(x = jitter)
                     .drawBehind { if (lit > 0.01f) style.highlight(this, lit, time) }
                     .padding(horizontal = 16.dp, vertical = 2.dp),
@@ -335,12 +350,29 @@ private fun Hud(number: Int, style: MenuStyle, fonts: MenuFonts, time: Float) {
             Spacer(Modifier.width(10.dp))
             Text(moonName(phase).uppercase(), style = fonts.hud.copy(color = style.ink))
         }
-        3 -> Row(verticalAlignment = Alignment.Bottom) {
+        3 -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.drawBehind {
+                // A dark glass tab, slanted like the lettering, with a cyan edge on its left.
+                val skew = size.height * 0.35f
+                drawPath(Path().apply { moveTo(skew, 0f); lineTo(size.width + skew, 0f); lineTo(size.width, size.height); lineTo(0f, size.height); close() }, Color(0xCC03102E))
+                drawPath(Path().apply { moveTo(skew, 0f); lineTo(skew + 6.dp.toPx(), 0f); lineTo(6.dp.toPx(), size.height); lineTo(0f, size.height); close() }, style.accentInk)
+            }.padding(start = 22.dp, end = 18.dp, top = 6.dp, bottom = 6.dp),
+        ) {
+            val phase = moonPhase(now.timeInMillis)
+            Canvas(Modifier.size(30.dp)) {
+                drawCircle(style.accentInk.copy(alpha = 0.35f + 0.15f * sin(time * 2f)), size.minDimension * 0.62f, style = Stroke(1.5.dp.toPx()))
+                drawMoon(phase, Color(0xFFF2FAFF))
+            }
+            Spacer(Modifier.width(12.dp))
             Text(date, style = fonts.hud.copy(color = style.ink, fontSize = 30.sp))
             Spacer(Modifier.width(8.dp))
             Text(day, style = fonts.hud.copy(color = style.accentInk))
             Spacer(Modifier.width(14.dp))
-            Text(timeOfDay(now.get(Calendar.HOUR_OF_DAY)).uppercase(), style = fonts.hud.copy(color = style.ink, fontSize = 16.sp))
+            Column {
+                Text(timeOfDay(now.get(Calendar.HOUR_OF_DAY)).uppercase(), maxLines = 1, softWrap = false, style = fonts.hud.copy(color = style.ink, fontSize = 15.sp))
+                Text(moonName(phase).uppercase(), maxLines = 1, softWrap = false, style = fonts.hud.copy(color = style.accentInk, fontSize = 12.sp))
+            }
         }
         4 -> Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$date ($day)", style = fonts.hud.copy(color = Color(0xFFF6C623)), modifier = Modifier.background(Color(0xFF16120A)).padding(horizontal = 10.dp, vertical = 2.dp))
@@ -404,13 +436,49 @@ private fun Portrait(number: Int, style: MenuStyle, time: Float, modifier: Modif
     val revision by MenuAssets.revision.collectAsState()
     val picture: ImageBitmap? = remember(number, revision) { characterBitmap(context, number) }
     Box(modifier, contentAlignment = Alignment.BottomCenter) {
-        if (picture != null) {
+        if (picture != null && number == 3) {
+            CutOut(picture, style, time)
+        } else if (picture != null) {
             // An outline of the panel's edge colour behind the picture, as the games cut their characters out.
             Image(picture, null, contentScale = ContentScale.Fit, alignment = Alignment.BottomCenter,
                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(style.outline),
                 modifier = Modifier.fillMaxSize().graphicsLayer { translationX = 6.dp.toPx(); translationY = -2.dp.toPx() })
             Image(picture, "Character", contentScale = ContentScale.Fit, alignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize())
         } else Canvas(Modifier.fillMaxSize()) { standIn(style, time) }
+    }
+}
+
+/**
+ * A picture cut out all round (Persona 3): a cyan glow behind it, pulsing slowly, then a white edge (the picture's shape in white, moved a
+ * little in eight directions), then the picture; one canvas, the picture fitted to the bottom centre.
+ */
+@Composable
+private fun CutOut(picture: ImageBitmap, style: MenuStyle, time: Float) {
+    val white = remember(style) { androidx.compose.ui.graphics.ColorFilter.tint(style.outline) }
+    val glowColor = style.accentInk
+    Canvas(Modifier.fillMaxSize()) {
+        val k = minOf(size.width / picture.width, size.height / picture.height)
+        val w = (picture.width * k).toInt()
+        val h = (picture.height * k).toInt()
+        val x = ((size.width - w) / 2).toInt()
+        val y = (size.height - h).toInt()
+        val dst = androidx.compose.ui.unit.IntSize(w, h)
+        fun at(dx: Float, dy: Float, filter: androidx.compose.ui.graphics.ColorFilter?, alpha: Float = 1f) =
+            drawImage(picture, dstOffset = androidx.compose.ui.unit.IntOffset(x + dx.toInt(), y + dy.toInt()), dstSize = dst, colorFilter = filter, alpha = alpha)
+        val glow = androidx.compose.ui.graphics.ColorFilter.tint(glowColor)
+        val g = 12.dp.toPx()
+        val pulse = 0.16f + 0.06f * sin(time * 1.7f)
+        for (d in 0 until 8) {
+            val a = d * PI.toFloat() / 4
+            at(cos(a) * g, sin(a) * g, glow, pulse)
+        }
+        at(g * 0.9f, g * 0.5f, androidx.compose.ui.graphics.ColorFilter.tint(style.shadow), 0.55f)
+        val e = 3.dp.toPx()
+        for (d in 0 until 8) {
+            val a = d * PI.toFloat() / 4
+            at(cos(a) * e, sin(a) * e, white)
+        }
+        at(0f, 0f, null)
     }
 }
 
@@ -506,7 +574,7 @@ internal class MenuStyle(
         when (number) {
             1 -> moonBackground(t)
             2 -> sigilBackground(t)
-            3 -> waterBackground(t)
+            3 -> nightSeaBackground(t, accentInk)
             4 -> tvBackground(t)
             else -> sunburstBackground(t)
         }
@@ -517,10 +585,20 @@ internal class MenuStyle(
         when (number) {
             1 -> { drawRect(Brush.verticalGradient(listOf(Color(0xFFEDE6FF), Color(0xFFB9A6E8)))); rings(t, Color(0xFF3A1C5A), center = Offset(size.width * 0.82f, size.height * 0.34f)) }
             2 -> { drawRect(Color(0xFF0B0405)); embers(t) }
-            3 -> { drawRect(Color(0xFFF4F7FA)); clock(t); cracks(Color(0xFF111418)) }
+            3 -> glassPanel(t, accentInk)
             4 -> tvPanel(t)
             else -> { drawRect(Color(0xFF0A0A0A)); stars(t) }
         }
+    }
+
+    /** The panel's edge. */
+    fun edge(scope: DrawScope, panel: Path) = with(scope) {
+        if (number == 3) {
+            // A glowing edge: a wide soft cyan line under a thin white one.
+            drawPath(panel, accentInk.copy(alpha = 0.18f), style = Stroke(width = 22.dp.toPx()))
+            drawPath(panel, accentInk.copy(alpha = 0.35f), style = Stroke(width = 9.dp.toPx()))
+            drawPath(panel, Color.White, style = Stroke(width = 3.dp.toPx()))
+        } else drawPath(panel, panelEdge, style = Stroke(width = 6.dp.toPx()))
     }
 
     /** Behind the chosen word: [lit] from 0 to 1 as it is chosen. */
@@ -530,10 +608,23 @@ internal class MenuStyle(
         val band = Path().apply { moveTo(skew, 0f); lineTo(w, 0f); lineTo(w - skew, size.height); lineTo(0f, size.height); close() }
         when (number) {
             3 -> {
-                drawPath(band, this@MenuStyle.band)
-                // A sweep of light along the band.
-                val x = ((t * 0.6f) % 1f) * size.width * 1.6f - size.width * 0.3f
-                clipPath(band) { drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent), x - 60f, x + 60f)) }
+                // Its shadow, deep blue, a little down and right.
+                translate(8.dp.toPx() * lit, 6.dp.toPx() * lit) { drawPath(band, shadow) }
+                // White to cyan.
+                drawPath(band, Brush.horizontalGradient(listOf(Color.White, accentInk, this@MenuStyle.band), 0f, size.width))
+                // A sweep of light along it.
+                val x = ((t * 0.5f) % 1f) * size.width * 1.6f - size.width * 0.3f
+                clipPath(band) { drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.7f), Color.Transparent), x - 70f, x + 70f)) }
+                // Its echo, rippling out and fading, as a ring spreads on water.
+                val ripple = (t * 0.6f) % 1f
+                val grow = 1f + 0.18f * ripple
+                val sx = size.width * lit
+                scale(grow, grow, Offset(sx / 2, size.height / 2)) { drawPath(band, Color.White.copy(alpha = (1f - ripple) * 0.55f * lit), style = Stroke(2.dp.toPx())) }
+                // The pointer, bobbing at its left.
+                val bob = sin(t * 4f) * 4.dp.toPx()
+                val ph = size.height * 0.36f
+                val px = -10.dp.toPx() + bob
+                drawPath(Path().apply { moveTo(px - ph * 0.9f, size.height / 2 - ph / 2); lineTo(px, size.height / 2); lineTo(px - ph * 0.9f, size.height / 2 + ph / 2); close() }, Color.White.copy(alpha = lit))
             }
             4 -> {
                 drawPath(band, this@MenuStyle.band)
@@ -551,7 +642,7 @@ internal class MenuStyle(
         fun of(number: Int): MenuStyle = when (number) {
             1 -> MenuStyle(1, Color(0xFF241238), Color.White, Color(0xFFC9B8FF), Color.White, Color(0xFF3A1C5A), Color(0xFF0E0618), Color.White, Color.White, Color(0xFF1B0E2C), Color(0xFFD9CCF5), Color(0xFFC9B8FF))
             2 -> MenuStyle(2, Color(0xFF3A0E15), Color(0xFFF4E9E4), Color(0xFFE0B04A), Color(0xFFE0B04A), Color(0xFF3A0E15), Color.Black, Color(0xFFE0B04A), Color(0xFFF4E9E4), Color(0xFF14050A), Color(0xFFF1D9CF), Color(0xFFE0B04A))
-            3 -> MenuStyle(3, Color(0xFF0A2C5E), Color.White, Color(0xFF8FD3FF), Color(0xFF29B6F6), Color.White, Color(0xFF041226), Color(0xFF111418), Color.White, Color(0xFF0B1220), Color(0xFFE8EEF5), Color(0xFF8FD3FF))
+            3 -> MenuStyle(3, Color(0xFF061A45), Color.White, Color(0xFF7FE0FF), Color(0xFF2FB8F5), Color(0xFF06204F), Color(0xFF0D4FA8), Color.White, Color.White, Color(0xFF0B1A3A), Color(0xFFE8EEF5), Color(0xFF7FE0FF))
             4 -> MenuStyle(4, Color(0xFFF6C623), Color(0xFF16120A), Color(0xFF16120A), Color(0xFF16120A), Color(0xFFF6C623), Color(0xFFFFE27A), Color(0xFF16120A), Color.White, Color(0xFF16120A), Color(0xFFF7E7B0), Color(0xFF16120A))
             else -> MenuStyle(5, Color(0xFFD7102C), Color.White, Color.White, Color.White, Color(0xFFD7102C), Color.Black, Color.Black, Color.White, Color(0xFF0A0A0A), Color(0xFFF2F2F2), Color.White)
         }
@@ -606,29 +697,122 @@ private fun DrawScope.sigilBackground(t: Float) {
     }
 }
 
-/** Persona 3: deep water, light moving through it in waves, bubbles rising. */
-private fun DrawScope.waterBackground(t: Float) {
-    drawRect(Brush.verticalGradient(listOf(Color(0xFF1F63B8), Color(0xFF062044))))
-    for (k in 0 until 7) {
-        val path = Path()
-        val baseY = size.height * (0.08f + k * 0.14f)
-        var x = 0f
-        path.moveTo(0f, baseY)
-        while (x <= size.width) {
-            path.lineTo(x, baseY + sin(x / 90f + t * (0.8f + k * 0.15f) + k) * 14f + sin(x / 37f - t * 1.3f) * 5f)
-            x += 12f
+/**
+ * Persona 3: the sea at night, from under the water. Deep blue going darker downwards, light falling in shafts from the surface (top right) and
+ * swaying, soft blurs of light drifting, the big moon behind the character with the month's eight phases turning round it (tonight's lit),
+ * bubbles rising and wobbling, specks drifting, and the edges darkened.
+ */
+private fun DrawScope.nightSeaBackground(t: Float, glow: Color) {
+    val w = size.width
+    val h = size.height
+    val wide = w > h
+    drawRect(Brush.linearGradient(listOf(Color(0xFF0E4FB0), Color(0xFF082A6B), Color(0xFF020A22)), Offset(w, 0f), Offset(w * 0.2f, h)))
+    // The surface's light, from above the top right.
+    val source = Offset(w * 0.78f, -h * 0.25f)
+    drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.35f), Color.Transparent), center = source, radius = h * 0.9f), h * 0.9f, source)
+    // Shafts of light fanning down from it, swaying.
+    for (k in 0 until 9) {
+        val a = (PI / 2).toFloat() + (k - 4) * 0.13f + sin(t * 0.25f + k * 1.7f) * 0.035f
+        val spread = 0.018f + (k % 3) * 0.012f
+        val len = h * 1.5f
+        val ray = Path().apply {
+            moveTo(source.x, source.y)
+            lineTo(source.x + cos(a - spread) * len, source.y + sin(a - spread) * len)
+            lineTo(source.x + cos(a + spread) * len, source.y + sin(a + spread) * len)
+            close()
         }
-        drawPath(path, Color.White.copy(alpha = 0.05f + (k % 2) * 0.03f), style = Stroke(10f + k * 3f))
+        val strength = 0.07f + 0.05f * ((sin(t * 0.6f + k * 2.3f) + 1f) / 2f)
+        drawPath(ray, Brush.radialGradient(listOf(Color.White.copy(alpha = strength), Color.Transparent), center = source, radius = len))
     }
-    for (i in 0 until 28) {
-        val x = ((i * 0.618f) % 1f) * size.width + sin(t * 1.4f + i) * 10f
-        val y = size.height - ((t * (0.05f + (i % 5) * 0.015f) + i * 0.071f) % 1f) * size.height
-        drawCircle(Color.White.copy(alpha = 0.22f), 2f + (i % 4) * 1.5f, Offset(x, y), style = Stroke(1.5f))
+    // Soft blurs of light, drifting up slowly.
+    for (i in 0 until 10) {
+        val r = (26f + (i % 4) * 16f) * density
+        val x = ((i * 0.618034f) % 1f) * w + sin(t * 0.2f + i) * 30f
+        val y = h + r - ((t * (0.008f + (i % 3) * 0.004f) + i * 0.173f) % 1f) * (h + 2 * r)
+        drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.10f + (i % 3) * 0.03f), Color.Transparent), center = Offset(x, y), radius = r), r, Offset(x, y))
     }
-    // Light from above.
-    for (k in 0 until 5) {
-        val x = size.width * (0.1f + k * 0.18f) + sin(t * 0.3f + k) * 30f
-        drawLine(Color.White.copy(alpha = 0.04f), Offset(x, 0f), Offset(x + 160f, size.height), strokeWidth = 50f)
+    // The edges darker.
+    drawRect(Brush.radialGradient(listOf(Color.Transparent, Color(0xAA010614)), center = Offset(w * 0.45f, h * 0.45f), radius = maxOf(w, h) * 0.85f))
+    // The moon, behind where the character stands, and its phases round it.
+    val moon = if (wide) Offset(w * 0.79f, h * 0.33f) else Offset(w * 0.72f, h * 0.47f)
+    val mr = if (wide) h * 0.21f else w * 0.21f
+    drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.45f), glow.copy(alpha = 0.12f), Color.Transparent), center = moon, radius = mr * 2.4f), mr * 2.4f, moon)
+    drawCircle(Brush.radialGradient(listOf(Color(0xFFF6FBFF), Color(0xFFCFE9FA)), center = Offset(moon.x - mr * 0.3f, moon.y - mr * 0.3f), radius = mr * 1.4f), mr, moon)
+    // Its seas, faint.
+    for ((dx, dy, rr) in listOf(Triple(-0.3f, -0.2f, 0.28f), Triple(0.25f, 0.1f, 0.2f), Triple(-0.05f, 0.4f, 0.16f), Triple(0.35f, -0.35f, 0.1f), Triple(-0.45f, 0.25f, 0.09f)))
+        drawCircle(Color(0xFF7FB4DA).copy(alpha = 0.22f), mr * rr, Offset(moon.x + dx * mr, moon.y + dy * mr))
+    val ring = mr * 1.38f
+    drawCircle(Color.White.copy(alpha = 0.22f), ring, moon, style = Stroke(1.5f * density))
+    drawCircle(Color.White.copy(alpha = 0.10f), ring * 1.12f, moon, style = Stroke(1f * density))
+    val tonight = ((moonPhase(System.currentTimeMillis()) * 8 + 0.5f).toInt()) % 8
+    val turn = t * 4f
+    for (k in 0 until 8) {
+        val a = (turn - 90f + k * 45f) * PI.toFloat() / 180f
+        val c = Offset(moon.x + cos(a) * ring, moon.y + sin(a) * ring)
+        val r = mr * (if (k == tonight) 0.12f else 0.085f)
+        if (k == tonight) drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.8f), Color.Transparent), center = c, radius = r * 2.8f), r * 2.8f, c)
+        translate(c.x - r, c.y - r) { drawPhase(k / 8f, r, if (k == tonight) Color.White else Color(0xFFDDF2FF)) }
+    }
+    // Bubbles rising, wobbling, each with a glint.
+    for (i in 0 until 30) {
+        val r = (2f + (i % 5) * 1.6f) * density
+        val speed = 0.035f + (i % 7) * 0.009f
+        val x = ((i * 0.7548777f) % 1f) * w + sin(t * (1.2f + (i % 3) * 0.4f) + i) * 9f * density
+        val y = h + r - ((t * speed + i * 0.0913f) % 1f) * (h + 2 * r)
+        val c = Offset(x, y)
+        drawCircle(Color.White.copy(alpha = 0.06f), r, c)
+        drawCircle(Color.White.copy(alpha = 0.45f), r, c, style = Stroke(1.1f * density))
+        drawCircle(Color.White.copy(alpha = 0.85f), r * 0.28f, Offset(x - r * 0.35f, y - r * 0.35f))
+    }
+    // Specks drifting.
+    for (i in 0 until 60) {
+        val x = ((i * 0.569840f) % 1f) * w + sin(t * 0.3f + i * 0.7f) * 14f
+        val y = (((i * 0.754877f) + t * 0.006f * (1 + i % 3)) % 1f) * h
+        drawCircle(Color(0xFFBFE8FF).copy(alpha = 0.18f + (i % 4) * 0.06f), (0.8f + (i % 3) * 0.5f) * density, Offset(x, y))
+    }
+}
+
+/** A moon of [phase] (0 new, 0.5 full) in a box of radius [r] at the origin. */
+private fun DrawScope.drawPhase(phase: Float, r: Float, color: Color) {
+    val c = Offset(r, r)
+    // The dark part, deep blue, and the disc's edge.
+    drawCircle(Color(0xFF0A2560), r, c)
+    drawCircle(color, r, c, style = Stroke(maxOf(1f, r * 0.12f)))
+    val k = cos(phase * 2 * PI).toFloat()
+    val waxing = phase < 0.5f
+    if (abs(phase) < 0.01f) return
+    val lit = Path().apply {
+        addArc(androidx.compose.ui.geometry.Rect(0f, 0f, 2 * r, 2 * r), if (waxing) -90f else 90f, 180f)
+        val ex = r * abs(k)
+        arcTo(androidx.compose.ui.geometry.Rect(r - ex, 0f, r + ex, 2 * r), if (waxing) 90f else -90f, if ((k > 0) == waxing) -180f else 180f, false)
+        close()
+    }
+    drawPath(lit, color)
+}
+
+/** Persona 3's panel: glass, lighter at the top, ripples of light running down it, and a glint crossing it now and then. */
+private fun DrawScope.glassPanel(t: Float, glow: Color) {
+    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), glow.copy(alpha = 0.06f), Color(0xFF041435).copy(alpha = 0.30f))))
+    // Lines of light running down, as light on water seen through glass.
+    for (k in 0 until 6) {
+        val y = (((t * 0.04f) + k / 6f) % 1f) * size.height
+        val path = Path()
+        var x = 0f
+        path.moveTo(0f, y)
+        while (x <= size.width) {
+            path.lineTo(x, y + sin(x / (34f * density) + t * 1.4f + k) * 5f * density)
+            x += 10f
+        }
+        drawPath(path, Color.White.copy(alpha = 0.10f), style = Stroke(1.5f * density))
+    }
+    // A glint every eight seconds, slanting across.
+    val g = (t % 8f) / 1.6f
+    if (g < 1f) {
+        val x = -size.width * 0.3f + g * size.width * 1.6f
+        rotate(20f, Offset(x, size.height / 2)) {
+            drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.22f), Color.Transparent), x - 50f * density, x + 50f * density),
+                Offset(x - 50f * density, -size.height), Size(100f * density, size.height * 3))
+        }
     }
 }
 
@@ -692,45 +876,6 @@ private fun DrawScope.rings(t: Float, color: Color, center: Offset = this.center
                 val inner = if (i % 3 == 0) r * 0.92f else r * 0.96f
                 drawLine(color, Offset(center.x + cos(a) * inner, center.y + sin(a) * inner), Offset(center.x + cos(a) * r, center.y + sin(a) * r), strokeWidth = 2f)
             }
-        }
-    }
-}
-
-/** A clock's face over the panel (Persona 3 Reload's), its rings turning, its hands moving. */
-private fun DrawScope.clock(t: Float) {
-    val c = Offset(size.width * 0.86f, size.height * 0.42f)
-    val r = size.minDimension * 0.46f
-    val ink = Color(0xFF111418)
-    for (k in 0 until 3) drawCircle(ink.copy(alpha = 0.55f - k * 0.12f), r * (1f - k * 0.16f), c, style = Stroke(10f - k * 3f))
-    rotate(t * 3f, c) {
-        for (i in 0 until 12) {
-            val a = i * 2 * PI.toFloat() / 12
-            val p0 = Offset(c.x + cos(a) * r * 0.78f, c.y + sin(a) * r * 0.78f)
-            val p1 = Offset(c.x + cos(a) * r * 0.9f, c.y + sin(a) * r * 0.9f)
-            drawLine(ink.copy(alpha = 0.6f), p0, p1, strokeWidth = if (i % 3 == 0) 14f else 6f)
-        }
-    }
-    val sec = (t % 60f) / 60f * 2 * PI.toFloat() - PI.toFloat() / 2
-    val min = (t / 3600f) * 2 * PI.toFloat() - PI.toFloat() / 2
-    drawLine(ink, c, Offset(c.x + cos(min) * r * 0.55f, c.y + sin(min) * r * 0.55f), strokeWidth = 14f, cap = StrokeCap.Round)
-    drawLine(ink.copy(alpha = 0.8f), c, Offset(c.x + cos(sec) * r * 0.72f, c.y + sin(sec) * r * 0.72f), strokeWidth = 4f, cap = StrokeCap.Round)
-}
-
-/** Cracks across the panel, from two points, always the same. */
-private fun DrawScope.cracks(color: Color) {
-    val random = java.util.Random(11)
-    for (origin in listOf(Offset(size.width * 0.75f, size.height * 0.2f), Offset(size.width * 0.62f, size.height * 0.75f))) {
-        repeat(9) {
-            var p = origin
-            var a = random.nextFloat() * 2 * PI.toFloat()
-            val path = Path().apply { moveTo(p.x, p.y) }
-            repeat(7) {
-                a += (random.nextFloat() - 0.5f) * 0.9f
-                val len = 30f + random.nextFloat() * 90f
-                p = Offset(p.x + cos(a) * len, p.y + sin(a) * len)
-                path.lineTo(p.x, p.y)
-            }
-            drawPath(path, color.copy(alpha = 0.8f), style = Stroke(2f + random.nextFloat() * 3f))
         }
     }
 }

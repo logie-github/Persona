@@ -102,8 +102,14 @@ to `ui/Launcher.kt`, `ui/Dialogs.kt` and `ui/Look.kt`), in each game's Persona c
   - Persona 1: violet night, the moon with a glow and a ring of runes turning, squares drifting up, stars; the chosen word on a white band. The moon's
     phase at the bottom (counted in eighths, as Persona 1 and 2 do, from a known new moon).
   - Persona 2: crimson, a jagged sigil turning, slashes of light, ash falling; a black panel with embers; the chosen word on gold; the moon's phase.
-  - Persona 3: deep water with light moving through it and bubbles; a white panel with a clock's rings turning, its hands moving and cracks across it;
-    slanted rounded lettering, the chosen word on a cyan band with a sweep of light; the date, the day and the time of day (the Dark Hour at midnight).
+  - Persona 3 (Reload's blue): the sea at night seen from under the water: shafts of light swaying down from the surface, soft blurs of light, bubbles
+    and specks rising, the edges darkened; the big moon behind the character with the month's eight phases turning round it (tonight's lit and
+    glowing); a glass panel with a glowing white and cyan edge, lines of light running down it and a glint crossing it every eight seconds. The
+    character (the user's Persona 3 Reload picture, `assets/characters/p3.png`, its white background cut away) cut out all round in white with a cyan
+    glow that pulses. Slanted rounded lettering stepping down to the right with a deep blue shadow; the chosen word on a white-to-cyan band with its
+    shadow, a sweep of light, its echo rippling out as a ring on water, and a pointer bobbing at its left; the title level with a line of light under
+    it. At the bottom, on a slanted dark glass tab: tonight's moon, the date, the day, the time of day (the Dark Hour at midnight) and the moon's phase.
+  - The title stays on one line on a narrow screen (smaller there).
   - Persona 4: yellow, fog drifting, hazard stripes running; a black TV panel with static, scan lines and a rolling band; the chosen word in a black box
     that jitters like a bad signal; the date and the time of day.
   - Persona 5: red, a sunburst turning, halftone dots; a black panel with stars; every word a ransom note (each letter its own face, box and tilt, fixed
@@ -116,7 +122,8 @@ to `ui/Launcher.kt`, `ui/Dialogs.kt` and `ui/Look.kt`), in each game's Persona c
   person has (the game's own) is set per game in Settings, Games: **Font** (checked by the phone's font loader, kept in `files/fonts/pN.ttf`), and used
   in place of the stand-in (in Persona 5's ransom notes beside the others).
 - **Characters.** Settings, Games: **Character** sets a game's picture (best with a transparent background; kept as `files/art/character-pN.png`); else the
-  app's own (`assets/characters/pN.png`: Persona 2's is the picture the user sent, 20 November 2026); else a stand-in figure in the game's colours.
+  app's own (`assets/characters/pN.png`: Persona 2's and Persona 3's are the pictures the user sent, 20 November 2026); else a stand-in figure in the
+  game's colours. A game's name under its box on the narrow screen chooses it as the box does.
 - **The accent** (buttons, switches, the list's marks) follows the chosen game's colours (`PersonaColors`); Persona 4's yellow carries black type.
 - **More** (or holding a game's row or box) opens its menu: Options, Mods (Persona 1), Box art, Send the log, Uninstall (asks first; saves stay).
 - **The gear** opens Settings: **Launcher** (the account signed in, the SteamGridDB key for Box art, Reports: what became of each report and Send the log
