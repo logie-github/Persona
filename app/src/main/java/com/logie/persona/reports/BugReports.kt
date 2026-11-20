@@ -84,7 +84,9 @@ object BugReports {
     const val repo = "logie-github/Persona"
 
     /** The token the issues are opened with: CI's PERSONA_REPORT_TOKEN secret, built in. Without one, reports wait. */
-    fun token(@Suppress("UNUSED_PARAMETER") context: Context): String = BuildConfig.REPORT_TOKEN
+    fun token(@Suppress("UNUSED_PARAMETER") context: Context): String =
+        // (Persona: never from a unit test: CI's tests ran with the token built in and opened real issues, #5, #6, #8 and #9)
+        if (Build.FINGERPRINT == "robolectric") "" else BuildConfig.REPORT_TOKEN
 
     fun configured(context: Context): Boolean = token(context).isNotEmpty()
 

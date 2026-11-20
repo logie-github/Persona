@@ -250,7 +250,10 @@ The Blizzard launcher's reports, ported whole (`reports/BugReports`, `SessionLog
   Box64's lines without the noise (`wine`: a repeated line said three times then counted; a longjmp's or a thread-naming exception's trace dropped),
   the libraries loaded (`lib`), the session keeper's log (`keeper`), memory, processes, heat and battery every few seconds while a game runs (`res`),
   how the last run ended (`exit`), what became of each report (`report`). Written line by line; the last six runs kept.
-- **A game's session** (`GameSession`, made by Winlator's game screen with the extra `game_id`, patch 0010): no game window in 90 seconds is a report; a
+- **A game's session** (`GameSession`, made by Winlator's game screen with the extra `game_id`, patch 0010): its programs as they come and go, every
+  150 ms, each with its parent ("process + P4G.exe (pid 232, parent 224)"), and who was still running when the session's program ended; Wine's desktop's
+  every message (the `explorer` channel, not cut by the repeat limiter: a desktop that closes because its programs are gone gets WM_CLOSE, 0x0010, then
+  "desktop message loop exiting"); no game window in 90 seconds is a report; a
   minute into the game its log goes once a day; a game that ends by itself (Wine's program ended without the player's Exit) within five minutes or with a
   failing status is a report, and the launcher's pop-up says so with the issue it became. Each carries the game's log (the libraries loaded, Wine's
   lines, the keeper's log: each program's start and end with its exit code, the game's windows, a dialog box's words, why the session ended; the app's
@@ -260,7 +263,8 @@ The Blizzard launcher's reports, ported whole (`reports/BugReports`, `SessionLog
 - **PLAY failing** before the game's screen, and an update's download failing: a report with the stack.
 - **Send the log**: in a game's menu (More) and in Settings' Reports; a toast says the issue it became.
 
-Each report is written to `files/reports` first and sent at once, then every minute while any wait, kept until GitHub takes it; a long log goes as
+Unit tests never send (no token under Robolectric, and CI runs the tests apart from the release build that carries it: with it, the tests opened
+issues #5, #6, #8 and #9). Each report is written to `files/reports` first and sent at once, then every minute while any wait, kept until GitHub takes it; a long log goes as
 several comments, the issue opened once. The same failure goes once a day per build (a new build reports again). A report never names the account
 (`<account>`) or the store (its name reads "store": the emulator's libraries appear as `store_api64.dll`), and never carries a key or a token.
 

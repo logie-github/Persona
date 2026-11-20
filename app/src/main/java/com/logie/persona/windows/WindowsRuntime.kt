@@ -146,7 +146,7 @@ object WindowsRuntime {
         // What Wine reports (errors, faults and their handlers, the libraries it loads) into the session's log (patches 0007, 0008).
         android.preference.PreferenceManager.getDefaultSharedPreferences(context).edit()
             // Box64's own log off, as the Blizzard launcher has it: it repeats its settings for every program Wine starts and slows a start.
-            .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll").putInt("box64_logs", 0).apply()
+            .putBoolean("enable_wine_debug", true).putString("wine_debug_channels", "err,seh,loaddll,explorer").putInt("box64_logs", 0).apply()
         val sessionLog = withContext(Dispatchers.IO) { File(context.filesDir, "windows-session.log").also { f -> if (f.isFile) f.renameTo(File(f.path + ".1")) } }
         // The session's keeper (borderless.exe, tools/borderless: the Blizzard launcher's): started before winhandler.exe and the game
         // (Winlator patch 0010). Its log of the session (each program's start and end with its code, the game's windows, a dialog's

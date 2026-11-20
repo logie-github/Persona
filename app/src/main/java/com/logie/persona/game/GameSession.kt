@@ -36,6 +36,33 @@ class GameSession(private val activity: AppCompatActivity, private val gameId: S
 
     private val title: String = Catalog.findVersion(gameId)?.let { v -> "${Catalog.gameOf(v).title} (${v.label})" } ?: gameId
 
+    /**
+     * The session's programs as they come and go, every 150 ms (the app's own processes: Wine's programs, Box64), each with its parent:
+     * a session that ends within seconds leaves the order its programs went in (Persona 4 Golden, 20 November 2026: the whole session
+     * ended 0.7 s after the game loaded, with nothing in Wine's own words).
+     */
+    private val watcher = Thread({
+        var before = emptyMap<Int, String>()
+        val self = android.os.Process.myPid()
+        while (!finished) {
+            val now = processes(self)
+            for ((pid, name) in now) if (pid !in before) GameLog.note("process + $name (pid $pid, parent ${parentOf(pid)})")
+            for ((pid, name) in before) if (pid !in now) GameLog.note("process - $name (pid $pid)")
+            before = now
+            try { Thread.sleep(150) } catch (_: InterruptedException) { return@Thread }
+        }
+    }, "persona-session-watch").apply { isDaemon = true }
+
+    private fun processes(self: Int): Map<Int, String> = runCatching {
+        com.logie.persona.reports.Diagnostics.readProcesses(self = self).filter { it.pid != self && !com.logie.persona.reports.Diagnostics.passing(it.name) }.associate { it.pid to it.name }
+    }.getOrDefault(emptyMap())
+
+    private fun parentOf(pid: Int): String = runCatching {
+        // /proc/<pid>/stat: "pid (comm) state ppid ..."; comm may hold spaces, so after the last ')'.
+        val stat = java.io.File("/proc/$pid/stat").readText()
+        stat.substringAfterLast(')').trim().split(' ')[1]
+    }.getOrDefault("?")
+
     init {
         alive = true
         GameLog.start()
@@ -48,7 +75,10 @@ class GameSession(private val activity: AppCompatActivity, private val gameId: S
             override fun onDestroy(owner: LifecycleOwner) { finish() }
         })
         handler.postDelayed(noWindowReport, 90_000)
+        watcher.start()
     }
+
+
 
     private fun seconds() = (SystemClock.elapsedRealtime() - started) / 1000
 
@@ -64,6 +94,9 @@ class GameSession(private val activity: AppCompatActivity, private val gameId: S
     fun onProgramEnded(status: Int) {
         programStatus = status
         GameLog.note("the session's program ended with status $status, ${seconds()} s after the screen opened${if (windowShown) "" else ", no game window yet"}")
+        // Who was still there at that moment, before Winlator ends the rest.
+        val alive = processes(android.os.Process.myPid())
+        GameLog.note("still running when it ended: " + if (alive.isEmpty()) "none" else alive.entries.joinToString { "${it.value} (${it.key})" })
     }
 
     fun onPlayerExit() {

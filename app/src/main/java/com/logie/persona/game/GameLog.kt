@@ -30,6 +30,12 @@ object GameLog {
     /** One line of the programs' output, into its place (and into the run's log file, [com.logie.persona.reports.SessionLog]). */
     internal fun take(line: String) {
         if (fault == null && line.contains("Unhandled ") && line.contains("wine")) fault = line.trim().take(200)
+        // (Persona) Wine's desktop, every message it gets (the explorer channel): how the session's desktop ended, which the repeat limiter
+        // would cut to three lines. A few hundred lines a session.
+        if (line.contains(":explorer:")) {
+            if (explorerLines++ < 3000) com.logie.persona.reports.SessionLog.event("wine", line.trim())
+            return
+        }
         if (line.contains(":loaddll:")) {
             synchronized(loaded) {
                 if (loaded.size >= MAX_LOADED) loaded.removeFirst()
@@ -88,7 +94,10 @@ object GameLog {
     }
 
     /** A new session: nothing of the last one's. */
+    @Volatile private var explorerLines = 0
+
     internal fun clear() {
+        explorerLines = 0
         synchronized(lines) { lines.clear(); unwinding.clear(); repeats.clear() }
         synchronized(loaded) { loaded.clear() }
         synchronized(notes) { notes.clear() }

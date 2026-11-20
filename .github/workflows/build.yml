@@ -45,12 +45,17 @@ jobs:
           key: persona-zig-${{ hashFiles('keeper.env') }}
       - name: Session keeper
         run: sh scripts/build-keeper.sh
-      - name: Build and test
+      # The tests without the reports' token (with it, a test that sends a report opened a real issue), then the release build with it.
+      - name: Test
+        run: >
+          ./gradlew :backend:test :app:testDebugUnitTest
+          -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
+      - name: Build
         env:
           # The reports' token (Issues: read and write on this repository), built into the app as the Blizzard launcher's is.
           PERSONA_REPORT_TOKEN: ${{ secrets.PERSONA_REPORT_TOKEN }}
         run: >
-          ./gradlew :backend:test :app:testDebugUnitTest :app:assembleRelease
+          ./gradlew :app:assembleRelease
           -PpersonaVersionCode=${{ github.run_number }} -PpersonaVersionName=1.0.${{ github.run_number }}
           -PpersonaReportToken="$PERSONA_REPORT_TOKEN"
       - run: cp app/build/outputs/apk/release/app-release.apk Persona.apk
